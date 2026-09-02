@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Work — Build Log</title>
+  <meta name="description" content="A short index of projects." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+  <div class="progress-rail" aria-hidden="true">
+    <div class="progress-rail__fill"></div>
+  </div>
+
+  <nav class="nav">
+    <a href="index.html" class="nav__mark">elx<span>/</span>build-log</a>
+    <ul class="nav__links">
+      <li><a href="index.html">home</a></li>
+      <li><a href="work.html" aria-current="page">work</a></li>
+      <li><a href="contact.html">contact</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section class="section" style="padding-top: clamp(120px, 16vh, 180px);">
+      <div class="section__inner">
+        <p class="line-tag reveal"><span class="line-tag__num">/</span> work</p>
+        <h1 style="font-size:clamp(2.2rem,4.4vw,3.2rem); max-width:16ch;" class="reveal">
+          A short list, kept honest.
+        </h1>
+        <p style="color:var(--text-dim); margin-top:18px;" class="reveal">
+          This page is a placeholder index for an experimental build —
+          swap these three entries for real projects whenever this
+          stops being a test.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+
+        <div class="project-row reveal">
+          <div class="project-row__num">01</div>
+          <div>
+            <h2 class="project-row__title">
+              University Talent Platform
+              <span>full-stack · solo build</span>
+            </h2>
+          </div>
+          <div>
+            <p class="project-row__desc">
+              A platform connecting students across departments for
+              collaboration on projects, hackathons, and coursework —
+              built end to end as an independent project.
+            </p>
+            <div class="project-row__stack">
+              <span class="chip">frontend</span>
+              <span class="chip">backend</span>
+              <span class="chip">database</span>
+              <span class="chip">auth</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="project-row reveal">
+          <div class="project-row__num">02</div>
+          <div>
+            <h2 class="project-row__title">
+              This Build Log
+              <span>experiment · in progress</span>
+            </h2>
+          </div>
+          <div>
+            <p class="project-row__desc">
+              The very site you're looking at — a small scroll-driven
+              homepage plus two supporting tabs, shipped as a static
+              zip with no build step.
+            </p>
+            <div class="project-row__stack">
+              <span class="chip">html</span>
+              <span class="chip">css</span>
+              <span class="chip">vanilla js</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="project-row reveal">
+          <div class="project-row__num">03</div>
+          <div>
+            <h2 class="project-row__title">
+              Next Thing
+              <span>idea · not started</span>
+            </h2>
+          </div>
+          <div>
+            <p class="project-row__desc">
+              Reserved slot for whatever gets built next. Kept here
+              deliberately empty rather than filled with filler copy.
+            </p>
+            <div class="project-row__stack">
+              <span class="chip">tbd</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="section" style="border-bottom:none;">
+      <div class="section__inner" style="text-align:left;">
+        <p class="line-tag reveal"><span class="line-tag__num">/</span> next</p>
+        <h2 class="reveal" style="font-size:clamp(1.6rem,3vw,2.2rem); max-width:20ch;">
+          Have something in mind you'd want built this way?
+        </h2>
+        <div class="hero__actions reveal">
+          <a href="contact.html" class="btn btn--primary">get in touch</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>&copy; <span data-year></span> — built as an experiment</span>
+    <span>home / work / contact</span>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>
