@@ -2,6 +2,8 @@ import './style.css'
 
 type IncomingWord = { word: string; x: number; y: number; speed: number }
 type Star = { x: number; y: number; speed: number; size: number; alpha: number }
+type MathOperation = '+' | '−' | '×'
+type MathQuestion = { left: number; right: number; operation: MathOperation; answer: number; key: string }
 
 // Standalone words only: no generated compounds, repeated stems, or near-identical variants.
 const wordBank = [
@@ -39,13 +41,41 @@ if (new Set(wordBank).size !== totalWords) throw new Error('The word deck contai
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
-  <main class="game-shell"><section class="game-card" aria-label="Word Siege typing game">
+  <main class="game-shell">
+    <nav class="game-switcher" aria-label="Choose a game">
+      <button class="game-tab is-active" type="button" data-game="word" aria-pressed="true">Word Siege</button>
+      <button class="game-tab" type="button" data-game="math" aria-pressed="false">Math Rush</button>
+    </nav>
+  <section class="game-card" id="word-game" aria-label="Word Siege typing game">
     <header class="hud"><div class="brand"><span>✦</span> WORD SIEGE</div><div class="stat"><span>Wave</span><strong id="wave">01</strong></div><div class="stat"><span>Cleared</span><strong id="cleared">000 / ${totalWords}</strong></div><div class="stat"><span>Best</span><strong id="best">000</strong></div></header>
     <div class="game-area"><canvas id="game" aria-label="Incoming words game field"></canvas>
       <div class="screen" id="screen"><div class="screen-content"><p class="eyebrow">TYPE TO SURVIVE</p><h1 id="screen-title">WORD SIEGE</h1><p id="screen-message">Destroy each incoming word before it reaches the shield.</p><button id="start" type="button">Start Run</button><p class="help">Type an incoming word exactly. No Enter required.</p></div></div>
       <div class="typing-bar"><span class="prompt">›</span><input id="typing" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type the incoming words" placeholder="type here…" disabled><span id="type-status">READY</span></div>
     </div>
     <footer class="footer"><span id="wave-info">Wave 01 · 1 word · 1 at a time</span><span>Sound on · Local ${totalWords}-word deck</span><button id="pause" type="button" aria-label="Pause game">Ⅱ</button></footer>
+  </section>
+  <section class="game-card math-card is-hidden" id="math-game" aria-label="Math Rush solving game">
+    <header class="math-hud">
+      <div class="brand"><span>✦</span> MATH RUSH</div>
+      <div class="stat"><span>Time</span><strong id="math-time">1:00</strong></div>
+      <div class="stat"><span>Level</span><strong id="math-level">01</strong></div>
+      <div class="stat"><span>Score</span><strong id="math-score">00</strong></div>
+      <div class="stat"><span>Best</span><strong id="math-best">00</strong></div>
+    </header>
+    <div class="math-area">
+      <div class="math-glow math-glow-one"></div><div class="math-glow math-glow-two"></div>
+      <p class="math-kicker" id="math-kicker">60-SECOND SPRINT</p>
+      <div class="math-question" id="math-question" aria-live="polite">READY?</div>
+      <p class="math-rule" id="math-rule">Addition, subtraction, and multiplication. Every correct answer raises the level.</p>
+      <form class="math-answer-form" id="math-answer-form">
+        <label class="sr-only" for="math-answer">Your answer</label>
+        <input id="math-answer" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="answer" disabled>
+        <button id="math-submit" type="submit" disabled>Check</button>
+      </form>
+      <p class="math-status" id="math-status" aria-live="polite">PRESS START WHEN YOU'RE READY</p>
+      <div class="math-progress" aria-hidden="true"><span id="math-progress-fill"></span></div>
+    </div>
+    <footer class="math-footer"><span>Questions never repeat during this session.</span><button id="math-start" type="button">Start 1-Minute Run</button></footer>
   </section></main>`
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
@@ -61,13 +91,33 @@ const clearedEl = document.querySelector<HTMLElement>('#cleared')!
 const bestEl = document.querySelector<HTMLElement>('#best')!
 const waveInfo = document.querySelector<HTMLElement>('#wave-info')!
 const statusEl = document.querySelector<HTMLElement>('#type-status')!
+const wordGame = document.querySelector<HTMLElement>('#word-game')!
+const mathGame = document.querySelector<HTMLElement>('#math-game')!
+const gameTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.game-tab'))
+const mathTimeEl = document.querySelector<HTMLElement>('#math-time')!
+const mathLevelEl = document.querySelector<HTMLElement>('#math-level')!
+const mathScoreEl = document.querySelector<HTMLElement>('#math-score')!
+const mathBestEl = document.querySelector<HTMLElement>('#math-best')!
+const mathQuestionEl = document.querySelector<HTMLElement>('#math-question')!
+const mathKickerEl = document.querySelector<HTMLElement>('#math-kicker')!
+const mathRuleEl = document.querySelector<HTMLElement>('#math-rule')!
+const mathAnswerForm = document.querySelector<HTMLFormElement>('#math-answer-form')!
+const mathAnswerInput = document.querySelector<HTMLInputElement>('#math-answer')!
+const mathSubmitButton = document.querySelector<HTMLButtonElement>('#math-submit')!
+const mathStatusEl = document.querySelector<HTMLElement>('#math-status')!
+const mathProgressFill = document.querySelector<HTMLElement>('#math-progress-fill')!
+const mathStartButton = document.querySelector<HTMLButtonElement>('#math-start')!
 
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
 let deck: string[] = [], incoming: IncomingWord[] = [], stars: Star[] = []
 let best = Number(localStorage.getItem('word-siege-best') ?? 0)
 let audioContext: AudioContext | undefined
+let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
+const usedMathQuestions = new Set<string>()
+let mathBest = Number(localStorage.getItem('math-rush-best') ?? 0)
 bestEl.textContent = String(best).padStart(3, '0')
+mathBestEl.textContent = String(mathBest).padStart(2, '0')
 
 function shuffle<T>(items: T[]) { const copy = [...items]; for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]] } return copy }
 function makeStar(randomY = false): Star { return { x: Math.random() * width, y: randomY ? Math.random() * height : -5, speed: 14 + Math.random() * 34, size: .5 + Math.random() * 1.7, alpha: .2 + Math.random() * .6 } }
@@ -89,12 +139,155 @@ function checkInput() { if (!active || paused) return; const typed = input.value
 function update(dt: number) { for (const star of stars) { star.y += star.speed * dt; if (star.y > height) Object.assign(star, makeStar()) }; if (!active || paused) return; if (nextWaveTimer > 0) { nextWaveTimer -= dt; if (nextWaveTimer <= 0) { wave++; beginWave() }; return }; const limit = Math.min(wave, 6); spawnTimer -= dt; if (spawned < waveSize && incoming.length < limit && spawnTimer <= 0) { spawnWord(); spawnTimer = Math.max(.4, 1.35 - wave * .06) }; for (const item of incoming) item.y += item.speed * dt; if (incoming.some((item) => item.y > height - 150)) { breachSound(); endGame(); return }; if (cleared === wordBank.length) { endGame(true); return }; if (spawned === waveSize && incoming.length === 0) { nextWaveTimer = 1.1; statusEl.textContent = 'WAVE CLEARED' } }
 function drawWord(item: IncomingWord) { const typed = input.value; const fontSize = width < 520 ? 18 : 22; ctx.font = `700 ${fontSize}px ui-monospace, monospace`; ctx.textAlign = 'center'; const match = typed && item.word.startsWith(typed); ctx.shadowBlur = match ? 18 : 11; ctx.shadowColor = match ? '#a8fbff' : '#fa6aa3'; ctx.fillStyle = match ? '#d9fdff' : '#ff91bd'; ctx.fillText(item.word, item.x, item.y); if (match) { const left = ctx.measureText(item.word.slice(0, typed.length)).width; const total = ctx.measureText(item.word).width; ctx.strokeStyle = '#82f8ff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(item.x - total / 2, item.y + 7); ctx.lineTo(item.x - total / 2 + left, item.y + 7); ctx.stroke() } }
 function draw() { const bg = ctx.createLinearGradient(0, 0, 0, height); bg.addColorStop(0, '#1a1036'); bg.addColorStop(.62, '#081a32'); bg.addColorStop(1, '#04101d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, width, height); for (const star of stars) { ctx.fillStyle = `rgba(185, 235, 255, ${star.alpha})`; ctx.fillRect(star.x, star.y, star.size, star.size) }; const shieldY = height - 108; ctx.strokeStyle = 'rgba(98, 244, 255, .5)'; ctx.shadowBlur = 14; ctx.shadowColor = '#66f8ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(width / 2, shieldY + 58, width * .37, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.shadowBlur = 0; ctx.fillStyle = '#87f9ff'; ctx.font = '700 12px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.fillText('SHIELD LINE', width / 2, height - 70); incoming.forEach(drawWord) }
-function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; update(dt); draw(); requestAnimationFrame(frame) }
+
+function randomInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
+function formatMathTime(seconds: number) { return `0:${String(Math.max(0, seconds)).padStart(2, '0')}` }
+function mathKey(left: number, right: number, operation: MathOperation) {
+  return operation === '−' ? `${left}${operation}${right}` : `${Math.min(left, right)}${operation}${Math.max(left, right)}`
+}
+function createMathQuestion(): MathQuestion {
+  const operations: MathOperation[] = mathLevel < 3 ? ['+', '−'] : ['+', '−', '×']
+  const base = mathLevel * 3
+
+  for (let attempt = 0; attempt < 400; attempt++) {
+    const operation = operations[randomInt(0, operations.length - 1)]
+    const span = 5 + mathLevel * 3
+    let left: number
+    let right: number
+
+    if (operation === '+') {
+      left = base + randomInt(1, span)
+      right = base + randomInt(1, span)
+    } else if (operation === '−') {
+      right = base + randomInt(1, span)
+      left = right + base + randomInt(1, span)
+    } else {
+      const factorBase = Math.max(2, Math.floor(mathLevel / 2) + 1)
+      const factorSpan = Math.min(14, 3 + Math.floor(mathLevel / 3))
+      left = factorBase + randomInt(0, factorSpan)
+      right = factorBase + randomInt(0, factorSpan)
+    }
+
+    const key = mathKey(left, right, operation)
+    if (!usedMathQuestions.has(key)) {
+      usedMathQuestions.add(key)
+      const answer = operation === '+' ? left + right : operation === '−' ? left - right : left * right
+      return { left, right, operation, answer, key }
+    }
+  }
+
+  // A deterministic fallback keeps the no-repeat promise intact even in an unusually long session.
+  const left = 10000 + usedMathQuestions.size * 11 + mathLevel
+  const right = mathLevel
+  const key = mathKey(left, right, '+')
+  usedMathQuestions.add(key)
+  return { left, right, operation: '+', answer: left + right, key }
+}
+function updateMathHud(remainingSeconds = 60) {
+  mathTimeEl.textContent = formatMathTime(remainingSeconds)
+  mathLevelEl.textContent = String(mathLevel).padStart(2, '0')
+  mathScoreEl.textContent = String(mathScore).padStart(2, '0')
+  mathProgressFill.style.width = `${Math.max(0, Math.min(100, (remainingSeconds / 60) * 100))}%`
+  if (mathScore > mathBest) {
+    mathBest = mathScore
+    mathBestEl.textContent = String(mathBest).padStart(2, '0')
+    localStorage.setItem('math-rush-best', String(mathBest))
+  }
+}
+function showMathQuestion() {
+  mathQuestion = createMathQuestion()
+  mathQuestionEl.textContent = `${mathQuestion.left} ${mathQuestion.operation} ${mathQuestion.right} = ?`
+}
+function animateMathQuestion(state: 'is-correct' | 'is-wrong') {
+  mathQuestionEl.classList.remove('is-correct', 'is-wrong')
+  void mathQuestionEl.offsetWidth
+  mathQuestionEl.classList.add(state)
+}
+function startMathGame() {
+  getAudio()
+  mathActive = true
+  mathLevel = 1
+  mathScore = 0
+  mathStartedAt = performance.now()
+  mathKickerEl.textContent = '60-SECOND SPRINT'
+  mathRuleEl.textContent = 'Solve fast: each correct answer moves you up one level.'
+  mathStatusEl.textContent = 'GO!'
+  mathAnswerInput.value = ''
+  mathAnswerInput.disabled = false
+  mathSubmitButton.disabled = false
+  mathStartButton.textContent = 'Running…'
+  mathStartButton.disabled = true
+  showMathQuestion()
+  updateMathHud()
+  mathAnswerInput.focus()
+}
+function finishMathGame() {
+  if (!mathActive) return
+  mathActive = false
+  mathAnswerInput.disabled = true
+  mathSubmitButton.disabled = true
+  mathQuestionEl.textContent = 'TIME!'
+  mathKickerEl.textContent = 'RUN COMPLETE'
+  mathRuleEl.textContent = `You solved ${mathScore} ${mathScore === 1 ? 'question' : 'questions'} and reached level ${mathLevel}.`
+  mathStatusEl.textContent = mathScore > 0 ? 'NICE RUN — READY FOR ANOTHER?' : 'START AGAIN AND SET YOUR PACE.'
+  mathProgressFill.style.width = '0%'
+  mathStartButton.textContent = 'Play Again'
+  mathStartButton.disabled = false
+  updateMathHud(0)
+}
+function updateMathTimer(now: number) {
+  if (!mathActive) return
+  const remainingMilliseconds = 60000 - (now - mathStartedAt)
+  if (remainingMilliseconds <= 0) {
+    finishMathGame()
+    return
+  }
+  updateMathHud(Math.ceil(remainingMilliseconds / 1000))
+}
+function submitMathAnswer() {
+  if (!mathActive || !mathQuestion) return
+  const value = mathAnswerInput.value.trim()
+  if (!/^-?\d+$/.test(value)) {
+    mathStatusEl.textContent = 'ENTER A WHOLE NUMBER'
+    animateMathQuestion('is-wrong')
+    return
+  }
+  if (Number(value) !== mathQuestion.answer) {
+    mathStatusEl.textContent = 'NOT QUITE — TRY AGAIN'
+    mathAnswerInput.select()
+    animateMathQuestion('is-wrong')
+    return
+  }
+  mathScore++
+  mathLevel++
+  clearSound()
+  mathStatusEl.textContent = 'CORRECT! NEXT LEVEL'
+  mathAnswerInput.value = ''
+  animateMathQuestion('is-correct')
+  showMathQuestion()
+  updateMathHud(Math.ceil(Math.max(0, 60000 - (performance.now() - mathStartedAt)) / 1000))
+}
+function selectGame(game: 'word' | 'math') {
+  const showMath = game === 'math'
+  if (showMath && active && !paused) togglePause()
+  wordGame.classList.toggle('is-hidden', showMath)
+  mathGame.classList.toggle('is-hidden', !showMath)
+  gameTabs.forEach((tab) => {
+    const selected = tab.dataset.game === game
+    tab.classList.toggle('is-active', selected)
+    tab.setAttribute('aria-pressed', String(selected))
+  })
+  if (showMath && mathActive) mathAnswerInput.focus()
+}
+function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; update(dt); updateMathTimer(now); draw(); requestAnimationFrame(frame) }
 
 input.addEventListener('input', checkInput)
 input.addEventListener('keydown', (event) => { if (event.key === 'Escape') togglePause(); if (event.key === ' ') event.preventDefault() })
 window.addEventListener('keydown', (event) => { if ((event.key === 'p' || event.key === 'Escape') && document.activeElement !== input) togglePause() })
 startButton.addEventListener('click', () => active && paused ? togglePause() : startGame())
 pauseButton.addEventListener('click', togglePause)
+mathAnswerForm.addEventListener('submit', (event) => { event.preventDefault(); submitMathAnswer() })
+mathStartButton.addEventListener('click', startMathGame)
+gameTabs.forEach((tab) => tab.addEventListener('click', () => selectGame(tab.dataset.game === 'math' ? 'math' : 'word')))
 window.addEventListener('resize', resize)
 resize(); updateHud(); updateWaveInfo(); requestAnimationFrame(frame)
