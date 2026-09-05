@@ -43,16 +43,16 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <main class="game-shell">
     <nav class="game-switcher" aria-label="Choose a game">
-      <button class="game-tab is-active" type="button" data-game="word" aria-pressed="true">Word Siege</button>
-      <button class="game-tab" type="button" data-game="math" aria-pressed="false">Math Rush</button>
+      <button class="game-tab is-active" type="button" data-game="word" aria-controls="word-game" aria-pressed="true">Word Siege</button>
+      <button class="game-tab" type="button" data-game="math" aria-controls="math-game" aria-pressed="false">Math Rush</button>
     </nav>
   <section class="game-card" id="word-game" aria-label="Word Siege typing game">
     <header class="hud"><div class="brand"><span>✦</span> WORD SIEGE</div><div class="stat"><span>Wave</span><strong id="wave">01</strong></div><div class="stat"><span>Cleared</span><strong id="cleared">000 / ${totalWords}</strong></div><div class="stat"><span>Best</span><strong id="best">000</strong></div></header>
     <div class="game-area"><canvas id="game" aria-label="Incoming words game field"></canvas>
       <div class="screen" id="screen"><div class="screen-content"><p class="eyebrow">TYPE TO SURVIVE</p><h1 id="screen-title">WORD SIEGE</h1><p id="screen-message">Destroy each incoming word before it reaches the shield.</p><button id="start" type="button">Start Run</button><p class="help">Type an incoming word exactly. No Enter required.</p></div></div>
-      <div class="typing-bar"><span class="prompt">›</span><input id="typing" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type the incoming words" placeholder="type here…" disabled><span id="type-status">READY</span></div>
+      <div class="typing-bar"><span class="prompt" aria-hidden="true">›</span><input id="typing" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Type the incoming words" placeholder="type here…" disabled><span id="type-status" aria-live="polite">READY</span></div>
     </div>
-    <footer class="footer"><span id="wave-info">Wave 01 · 1 word · 1 at a time</span><span>Sound on · Local ${totalWords}-word deck</span><button id="pause" type="button" aria-label="Pause game">Ⅱ</button></footer>
+    <footer class="footer"><span id="wave-info">Wave 01 · 1 word · 1 at a time</span><span>Sound on · Local ${totalWords}-word deck</span><button id="pause" type="button" aria-label="Pause game" aria-pressed="false">Ⅱ</button></footer>
   </section>
   <section class="game-card math-card is-hidden" id="math-game" aria-label="Math Rush solving game">
     <header class="math-hud">
@@ -111,33 +111,34 @@ const mathStartButton = document.querySelector<HTMLButtonElement>('#math-start')
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
 let deck: string[] = [], incoming: IncomingWord[] = [], stars: Star[] = []
-let best = Number(localStorage.getItem('word-siege-best') ?? 0)
+let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
 let background = ctx.createLinearGradient(0, 0, 0, 1)
 let selectedGame: 'word' | 'math' = 'word'
-let wordCanvasDirty = true, resizeFrame = 0, animationFrame: number | undefined, mathTimer: number | undefined
-let lastTypeSoundAt = 0, displayedMathSeconds = -1, lastMathProgressUpdate = 0
+let resizeFrame = 0, lastTypeSoundAt = 0
 const usedMathQuestions = new Set<string>()
-let mathBest = Number(localStorage.getItem('math-rush-best') ?? 0)
+let mathBest = getStoredScore('math-rush-best')
 bestEl.textContent = String(best).padStart(3, '0')
 mathBestEl.textContent = String(mathBest).padStart(2, '0')
 
 function shuffle<T>(items: T[]) { const copy = [...items]; for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]] } return copy }
+function getStoredScore(key: string) { try { const value = Number(localStorage.getItem(key)); return Number.isFinite(value) && value >= 0 ? value : 0 } catch { return 0 } }
+function saveScore(key: string, value: number) { try { localStorage.setItem(key, String(value)) } catch { /* Scores remain available for this run when storage is blocked. */ } }
 function makeStar(randomY = false): Star { const alpha = .2 + Math.random() * .6; return { x: Math.random() * width, y: randomY ? Math.random() * height : -5, speed: 14 + Math.random() * 34, size: .5 + Math.random() * 1.7, color: `rgba(185, 235, 255, ${alpha})` } }
-function resize() { const rect = canvas.parentElement!.getBoundingClientRect(); scale = Math.min(devicePixelRatio || 1, 1.5); width = Math.max(320, rect.width); height = Math.max(580, Math.min(width * .9, innerHeight * .8)); canvas.width = width * scale; canvas.height = height * scale; canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; ctx.setTransform(scale, 0, 0, scale, 0, 0); background = ctx.createLinearGradient(0, 0, 0, height); background.addColorStop(0, '#1a1036'); background.addColorStop(.62, '#081a32'); background.addColorStop(1, '#04101d'); stars = Array.from({ length: Math.ceil(width / 16) }, () => makeStar(true)); wordCanvasDirty = true }
-function queueResize() { if (selectedGame !== 'word' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resize(); scheduleFrame() }) }
+function resize() { const rect = canvas.parentElement!.getBoundingClientRect(); scale = Math.min(devicePixelRatio || 1, 1.5); width = Math.max(320, rect.width); height = Math.max(580, Math.min(width * .9, innerHeight * .8)); canvas.width = width * scale; canvas.height = height * scale; canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; ctx.setTransform(scale, 0, 0, scale, 0, 0); background = ctx.createLinearGradient(0, 0, 0, height); background.addColorStop(0, '#1a1036'); background.addColorStop(.62, '#081a32'); background.addColorStop(1, '#04101d'); stars = Array.from({ length: Math.ceil(width / 16) }, () => makeStar(true)) }
+function queueResize() { if (selectedGame !== 'word' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resize() }) }
 function getAudio() { audioContext ??= new AudioContext(); if (audioContext.state === 'suspended') void audioContext.resume(); return audioContext }
 function tone(start: number, duration: number, type: OscillatorType, end: number, volume = .04) { const audio = getAudio(), now = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain(); osc.type = type; osc.frequency.setValueAtTime(start, now); osc.frequency.exponentialRampToValueAtTime(end, now + duration); gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.001, now + duration); osc.connect(gain).connect(audio.destination); osc.start(now); osc.stop(now + duration) }
 function typeSound() { const now = performance.now(); if (now - lastTypeSoundAt < 35) return; lastTypeSoundAt = now; tone(420 + Math.random() * 80, .035, 'square', 560, .018) }
 function clearSound() { tone(520, .12, 'triangle', 1040, .05) }
 function breachSound() { tone(170, .45, 'sawtooth', 48, .07) }
-function updateHud() { waveEl.textContent = String(wave).padStart(2, '0'); clearedEl.textContent = `${String(cleared).padStart(3, '0')} / ${totalWords}`; if (cleared > best) { best = cleared; bestEl.textContent = String(best).padStart(3, '0'); localStorage.setItem('word-siege-best', String(best)) } }
+function updateHud() { waveEl.textContent = String(wave).padStart(2, '0'); clearedEl.textContent = `${String(cleared).padStart(3, '0')} / ${totalWords}`; if (cleared > best) { best = cleared; bestEl.textContent = String(best).padStart(3, '0'); saveScore('word-siege-best', best) } }
 function updateWaveInfo() { waveInfo.textContent = `Wave ${String(wave).padStart(2, '0')} · ${waveSize} word${waveSize === 1 ? '' : 's'} · ${Math.min(wave, 6)} at a time` }
 function beginWave() { waveSize = wave === 1 ? 1 : Math.min(wave * 10, wordBank.length - deckIndex); spawned = 0; spawnTimer = .45; nextWaveTimer = 0; updateHud(); updateWaveInfo(); statusEl.textContent = `WAVE ${String(wave).padStart(2, '0')}` }
-function startGame() { getAudio(); deck = shuffle(wordBank); deckIndex = 0; wave = 1; cleared = 0; incoming = []; active = true; paused = false; input.disabled = false; input.value = ''; screen.classList.add('hidden'); pauseButton.textContent = 'Ⅱ'; beginWave(); wordCanvasDirty = true; scheduleFrame(); input.focus() }
-function endGame(victory = false) { active = false; input.disabled = true; title.textContent = victory ? 'ALL CLEAR' : 'SHIELD BREACHED'; message.textContent = victory ? `You cleared all ${totalWords} words.` : `You cleared ${cleared} of ${totalWords} words.`; startButton.textContent = victory ? 'New Run' : 'Try Again'; screen.classList.remove('hidden'); statusEl.textContent = victory ? 'VICTORY' : 'GAME OVER'; wordCanvasDirty = true; scheduleFrame() }
-function togglePause() { if (!active) return; paused = !paused; pauseButton.textContent = paused ? '▶' : 'Ⅱ'; if (paused) { title.textContent = 'PAUSED'; message.textContent = 'Your shield is holding.'; startButton.textContent = 'Resume'; screen.classList.remove('hidden'); input.blur() } else { screen.classList.add('hidden'); input.focus() }; wordCanvasDirty = true; scheduleFrame() }
+function startGame() { getAudio(); deck = shuffle(wordBank); deckIndex = 0; wave = 1; cleared = 0; incoming = []; active = true; paused = false; input.disabled = false; input.value = ''; screen.classList.add('hidden'); pauseButton.textContent = 'Ⅱ'; pauseButton.setAttribute('aria-pressed', 'false'); pauseButton.setAttribute('aria-label', 'Pause game'); beginWave(); input.focus() }
+function endGame(victory = false) { active = false; input.disabled = true; title.textContent = victory ? 'ALL CLEAR' : 'SHIELD BREACHED'; message.textContent = victory ? `You cleared all ${totalWords} words.` : `You cleared ${cleared} of ${totalWords} words.`; startButton.textContent = victory ? 'New Run' : 'Try Again'; screen.classList.remove('hidden'); statusEl.textContent = victory ? 'VICTORY' : 'GAME OVER' }
+function togglePause() { if (!active) return; paused = !paused; pauseButton.textContent = paused ? '▶' : 'Ⅱ'; pauseButton.setAttribute('aria-pressed', String(paused)); pauseButton.setAttribute('aria-label', paused ? 'Resume game' : 'Pause game'); if (paused) { title.textContent = 'PAUSED'; message.textContent = 'Your shield is holding.'; startButton.textContent = 'Resume'; screen.classList.remove('hidden'); input.blur() } else { screen.classList.add('hidden'); input.focus() } }
 function spawnWord() { const word = deck[deckIndex++]; const fontSize = width < 520 ? 18 : 22; ctx.font = `700 ${fontSize}px ui-monospace, monospace`; const margin = Math.min(width * .15, ctx.measureText(word).width / 2 + 16); incoming.push({ word, x: margin + Math.random() * Math.max(1, width - margin * 2), y: -24, speed: 20 + wave * 5 + Math.random() * 11 }) ; spawned++ }
 function targetFor(text: string) { let target: IncomingWord | undefined; for (const item of incoming) if (item.word.startsWith(text) && (!target || item.y > target.y)) target = item; return target }
 function checkInput() { if (!active || paused) return; const typed = input.value.toLowerCase().replace(/[^a-z]/g, ''); if (typed !== input.value) input.value = typed; if (!typed) { statusEl.textContent = `WAVE ${String(wave).padStart(2, '0')}`; return }; typeSound(); const target = targetFor(typed); if (!target) { input.value = ''; statusEl.textContent = 'NO MATCH'; return }; statusEl.textContent = `${target.word.length - typed.length} LEFT`; if (typed === target.word) { incoming.splice(incoming.indexOf(target), 1); input.value = ''; cleared++; clearSound(); updateHud(); statusEl.textContent = 'WORD CLEARED' } }
@@ -196,7 +197,7 @@ function updateMathHud(remainingSeconds = 60) {
   if (mathScore > mathBest) {
     mathBest = mathScore
     mathBestEl.textContent = String(mathBest).padStart(2, '0')
-    localStorage.setItem('math-rush-best', String(mathBest))
+    saveScore('math-rush-best', mathBest)
   }
 }
 function showMathQuestion() {
@@ -282,17 +283,19 @@ function selectGame(game: 'word' | 'math') {
     tab.classList.toggle('is-active', selected)
     tab.setAttribute('aria-pressed', String(selected))
   })
+  selectedGame = game
+  if (!showMath) queueResize()
   if (showMath && mathActive) mathAnswerInput.focus()
 }
-function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; update(dt); updateMathTimer(now); draw(); requestAnimationFrame(frame) }
+function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; if (selectedGame === 'word') { update(dt); draw() }; updateMathTimer(now); requestAnimationFrame(frame) }
 
 input.addEventListener('input', checkInput)
 input.addEventListener('keydown', (event) => { if (event.key === 'Escape') togglePause(); if (event.key === ' ') event.preventDefault() })
-window.addEventListener('keydown', (event) => { if ((event.key === 'p' || event.key === 'Escape') && document.activeElement !== input) togglePause() })
+window.addEventListener('keydown', (event) => { if (selectedGame === 'word' && (event.key === 'p' || event.key === 'Escape') && document.activeElement !== input) togglePause() })
 startButton.addEventListener('click', () => active && paused ? togglePause() : startGame())
 pauseButton.addEventListener('click', togglePause)
 mathAnswerForm.addEventListener('submit', (event) => { event.preventDefault(); submitMathAnswer() })
 mathStartButton.addEventListener('click', startMathGame)
 gameTabs.forEach((tab) => tab.addEventListener('click', () => selectGame(tab.dataset.game === 'math' ? 'math' : 'word')))
-window.addEventListener('resize', resize)
+window.addEventListener('resize', queueResize)
 resize(); updateHud(); updateWaveInfo(); requestAnimationFrame(frame)
