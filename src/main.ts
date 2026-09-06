@@ -2,6 +2,7 @@ import './style.css'
 
 type IncomingWord = { word: string; x: number; y: number; speed: number }
 type Star = { x: number; y: number; speed: number; size: number; color: string }
+type SpeedBurst = { x: number; y: number; wpm: number; age: number }
 type MathOperation = '+' | '−' | '×'
 type MathQuestion = { left: number; right: number; operation: MathOperation; answer: number; key: string }
 
@@ -115,7 +116,8 @@ const mathStartButton = document.querySelector<HTMLButtonElement>('#math-start')
 
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
-let deck: string[] = [], incoming: IncomingWord[] = [], stars: Star[] = []
+let deck: string[] = [], incoming: IncomingWord[] = [], stars: Star[] = [], speedBursts: SpeedBurst[] = []
+let wordTypeStartedAt = 0
 let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
@@ -135,21 +137,144 @@ function resize() { const rect = canvas.parentElement!.getBoundingClientRect(); 
 function queueResize() { if (selectedGame !== 'word' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resize() }) }
 function getAudio() { audioContext ??= new AudioContext(); if (audioContext.state === 'suspended') void audioContext.resume(); return audioContext }
 function tone(start: number, duration: number, type: OscillatorType, end: number, volume = .04) { const audio = getAudio(), now = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain(); osc.type = type; osc.frequency.setValueAtTime(start, now); osc.frequency.exponentialRampToValueAtTime(end, now + duration); gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.001, now + duration); osc.connect(gain).connect(audio.destination); osc.start(now); osc.stop(now + duration) }
-function typeSound() { const now = performance.now(); if (now - lastTypeSoundAt < 35) return; lastTypeSoundAt = now; tone(420 + Math.random() * 80, .035, 'square', 560, .018) }
-function clearSound() { tone(520, .12, 'triangle', 1040, .05) }
+function typeSound() {
+  const nowPerf = performance.now()
+  if (nowPerf - lastTypeSoundAt < 28) return
+  lastTypeSoundAt = nowPerf
+  const audio = getAudio()
+  const now = audio.currentTime
+  const duration = .07
+  const buffer = audio.createBuffer(1, Math.floor(audio.sampleRate * duration), audio.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 6)
+  const noise = audio.createBufferSource()
+  noise.buffer = buffer
+  const filter = audio.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = 800 + Math.random() * 160
+  filter.Q.value = 0.7
+  const noiseGain = audio.createGain()
+  noiseGain.gain.setValueAtTime(.012, now)
+  noiseGain.gain.exponentialRampToValueAtTime(.001, now + duration)
+  noise.connect(filter).connect(noiseGain).connect(audio.destination)
+  noise.start(now)
+  const osc = audio.createOscillator()
+  const oscGain = audio.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(260 + Math.random() * 20, now)
+  oscGain.gain.setValueAtTime(.004, now)
+  oscGain.gain.exponentialRampToValueAtTime(.001, now + .06)
+  osc.connect(oscGain).connect(audio.destination)
+  osc.start(now)
+  osc.stop(now + .06)
+}
+function clearSound() { tone(420, .16, 'sine', 680, .018) }
 function breachSound() { tone(170, .45, 'sawtooth', 48, .07) }
 function updateHud() { waveEl.textContent = String(wave).padStart(2, '0'); clearedEl.textContent = `${String(cleared).padStart(3, '0')} / ${totalWords}`; if (cleared > best) { best = cleared; bestEl.textContent = String(best).padStart(3, '0'); saveScore('word-siege-best', best) } }
 function updateWaveInfo() { waveInfo.textContent = `Wave ${String(wave).padStart(2, '0')} · ${waveSize} word${waveSize === 1 ? '' : 's'} · ${Math.min(wave, 6)} at a time` }
 function beginWave() { waveSize = wave === 1 ? 1 : Math.min(wave * 10, wordBank.length - deckIndex); spawned = 0; spawnTimer = .45; nextWaveTimer = 0; updateHud(); updateWaveInfo(); statusEl.textContent = `WAVE ${String(wave).padStart(2, '0')}` }
-function startGame() { getAudio(); deck = shuffle(wordBank); deckIndex = 0; wave = 1; cleared = 0; incoming = []; active = true; paused = false; input.disabled = false; input.value = ''; screen.classList.add('hidden'); pauseButton.textContent = 'Ⅱ'; pauseButton.setAttribute('aria-pressed', 'false'); pauseButton.setAttribute('aria-label', 'Pause game'); beginWave(); input.focus() }
+function startGame() { getAudio(); deck = shuffle(wordBank); deckIndex = 0; wave = 1; cleared = 0; incoming = []; speedBursts = []; wordTypeStartedAt = 0; active = true; paused = false; input.disabled = false; input.value = ''; screen.classList.add('hidden'); pauseButton.textContent = 'Ⅱ'; pauseButton.setAttribute('aria-pressed', 'false'); pauseButton.setAttribute('aria-label', 'Pause game'); beginWave(); input.focus() }
 function endGame(victory = false) { active = false; input.disabled = true; title.textContent = victory ? 'ALL CLEAR' : 'SHIELD BREACHED'; message.textContent = victory ? `You cleared all ${totalWords} words.` : `You cleared ${cleared} of ${totalWords} words.`; startButton.textContent = victory ? 'New Run' : 'Try Again'; screen.classList.remove('hidden'); statusEl.textContent = victory ? 'VICTORY' : 'GAME OVER' }
 function togglePause() { if (!active) return; paused = !paused; pauseButton.textContent = paused ? '▶' : 'Ⅱ'; pauseButton.setAttribute('aria-pressed', String(paused)); pauseButton.setAttribute('aria-label', paused ? 'Resume game' : 'Pause game'); if (paused) { title.textContent = 'PAUSED'; message.textContent = 'Your shield is holding.'; startButton.textContent = 'Resume'; screen.classList.remove('hidden'); input.blur() } else { screen.classList.add('hidden'); input.focus() } }
 function spawnWord() { const word = deck[deckIndex++]; const fontSize = width < 520 ? 18 : 22; ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`; const margin = Math.min(width * .15, ctx.measureText(word.toUpperCase()).width / 2 + 16); incoming.push({ word, x: margin + Math.random() * Math.max(1, width - margin * 2), y: -24, speed: 20 + wave * 5 + Math.random() * 11 }) ; spawned++ }
 function targetFor(text: string) { let target: IncomingWord | undefined; for (const item of incoming) if (item.word.startsWith(text) && (!target || item.y > target.y)) target = item; return target }
-function checkInput() { if (!active || paused) return; const typed = input.value.toLowerCase().replace(/[^a-z]/g, ''); if (typed !== input.value) input.value = typed; if (!typed) { statusEl.textContent = `WAVE ${String(wave).padStart(2, '0')}`; return }; typeSound(); const target = targetFor(typed); if (!target) { input.value = ''; statusEl.textContent = 'NO MATCH'; return }; statusEl.textContent = `${target.word.length - typed.length} LEFT`; if (typed === target.word) { incoming.splice(incoming.indexOf(target), 1); input.value = ''; cleared++; clearSound(); updateHud(); statusEl.textContent = 'WORD CLEARED' } }
-function update(dt: number) { if (!active || paused) return; for (const star of stars) { star.y += star.speed * dt; if (star.y > height) Object.assign(star, makeStar()) }; if (nextWaveTimer > 0) { nextWaveTimer -= dt; if (nextWaveTimer <= 0) { wave++; beginWave() }; return }; const limit = Math.min(wave, 6); spawnTimer -= dt; if (spawned < waveSize && incoming.length < limit && spawnTimer <= 0) { spawnWord(); spawnTimer = Math.max(.4, 1.35 - wave * .06) }; for (const item of incoming) item.y += item.speed * dt; if (incoming.some((item) => item.y > height - 150)) { breachSound(); endGame(); return }; if (cleared === wordBank.length) { endGame(true); return }; if (spawned === waveSize && incoming.length === 0) { nextWaveTimer = 1.1; statusEl.textContent = 'WAVE CLEARED' } }
-function drawWord(item: IncomingWord) { const typed = input.value; const fontSize = width < 520 ? 18 : 22; ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`; ctx.textAlign = 'center'; const match = typed && item.word.startsWith(typed); ctx.shadowBlur = 0; ctx.fillStyle = match ? '#ffedd7' : '#dc5000'; ctx.fillText(item.word.toUpperCase(), item.x, item.y); if (match) { const left = ctx.measureText(item.word.slice(0, typed.length).toUpperCase()).width; const total = ctx.measureText(item.word.toUpperCase()).width; ctx.strokeStyle = '#ffedd7'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(item.x - total / 2, item.y + 7); ctx.lineTo(item.x - total / 2 + left, item.y + 7); ctx.stroke(); ctx.setLineDash([]) } }
-function draw() { ctx.clearRect(0, 0, width, height); ctx.fillStyle = background; ctx.fillRect(0, 0, width, height); for (const star of stars) { ctx.fillStyle = star.color; ctx.fillRect(star.x, star.y, star.size, star.size) }; const shieldY = height - 108; ctx.strokeStyle = 'rgba(64, 55, 46, 1)'; ctx.shadowBlur = 0; ctx.lineWidth = 1; ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.arc(width / 2, shieldY + 58, width * .37, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = '#ffedd7'; ctx.font = '500 12px Inter, ui-sans-serif, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('SHIELD LINE', width / 2, height - 70); incoming.forEach(drawWord) }
+function checkInput() {
+  if (!active || paused) return
+  const typed = input.value.toLowerCase().replace(/[^a-z]/g, '')
+  if (typed !== input.value) input.value = typed
+  if (!typed) {
+    wordTypeStartedAt = 0
+    statusEl.textContent = `WAVE ${String(wave).padStart(2, '0')}`
+    return
+  }
+  if (typed.length === 1) wordTypeStartedAt = performance.now()
+  typeSound()
+  const target = targetFor(typed)
+  if (!target) {
+    wordTypeStartedAt = 0
+    input.value = ''
+    statusEl.textContent = 'NO MATCH'
+    return
+  }
+  statusEl.textContent = `${target.word.length - typed.length} LEFT`
+  if (typed === target.word) {
+    const elapsed = Math.max(.08, (performance.now() - (wordTypeStartedAt || performance.now())) / 1000)
+    const wpm = Math.max(1, Math.round((target.word.length / 5) * 60 / elapsed))
+    speedBursts.push({ x: target.x, y: target.y, wpm, age: 0 })
+    incoming.splice(incoming.indexOf(target), 1)
+    input.value = ''
+    wordTypeStartedAt = 0
+    cleared++
+    clearSound()
+    updateHud()
+    statusEl.textContent = 'WORD CLEARED'
+  }
+}
+function update(dt: number) {
+  if (!active || paused) return
+  for (const burst of speedBursts) burst.age += dt
+  speedBursts = speedBursts.filter((burst) => burst.age < 1)
+  for (const star of stars) { star.y += star.speed * dt; if (star.y > height) Object.assign(star, makeStar()) }
+  if (nextWaveTimer > 0) { nextWaveTimer -= dt; if (nextWaveTimer <= 0) { wave++; beginWave() }; return }
+  const limit = Math.min(wave, 6)
+  spawnTimer -= dt
+  if (spawned < waveSize && incoming.length < limit && spawnTimer <= 0) { spawnWord(); spawnTimer = Math.max(.4, 1.35 - wave * .06) }
+  for (const item of incoming) item.y += item.speed * dt
+  if (incoming.some((item) => item.y > height - 150)) { breachSound(); endGame(); return }
+  if (cleared === wordBank.length && speedBursts.length === 0) { endGame(true); return }
+  if (spawned === waveSize && incoming.length === 0 && cleared < wordBank.length) { nextWaveTimer = 1.1; statusEl.textContent = 'WAVE CLEARED' }
+}
+function drawWord(item: IncomingWord) {
+  const typed = input.value
+  const fontSize = width < 520 ? 18 : 22
+  ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`
+  ctx.textAlign = 'center'
+  const match = typed && item.word.startsWith(typed)
+  ctx.shadowBlur = 0
+  ctx.fillStyle = '#4a4a4a'
+  ctx.fillText(item.word.toUpperCase(), item.x, item.y)
+  if (match) {
+    const left = ctx.measureText(item.word.slice(0, typed.length).toUpperCase()).width
+    const total = ctx.measureText(item.word.toUpperCase()).width
+    ctx.strokeStyle = '#4a4a4a'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.moveTo(item.x - total / 2, item.y + 7)
+    ctx.lineTo(item.x - total / 2 + left, item.y + 7)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+}
+function drawSpeedBurst(burst: SpeedBurst) {
+  const alpha = Math.max(0, 1 - burst.age)
+  const fontSize = width < 520 ? 13 : 15
+  ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.fillStyle = `rgba(74, 74, 74, ${alpha})`
+  ctx.fillText(`${burst.wpm} WPM`, burst.x, burst.y)
+}
+function draw() {
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, height)
+  for (const star of stars) { ctx.fillStyle = star.color; ctx.fillRect(star.x, star.y, star.size, star.size) }
+  const shieldY = height - 108
+  ctx.strokeStyle = 'rgba(64, 55, 46, 1)'
+  ctx.shadowBlur = 0
+  ctx.lineWidth = 1
+  ctx.setLineDash([6, 6])
+  ctx.beginPath()
+  ctx.arc(width / 2, shieldY + 58, width * .37, Math.PI * 1.15, Math.PI * 1.85)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.fillStyle = '#ffedd7'
+  ctx.font = '500 12px Inter, ui-sans-serif, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('SHIELD LINE', width / 2, height - 70)
+  incoming.forEach(drawWord)
+  speedBursts.forEach(drawSpeedBurst)
+}
 
 function randomInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
 function formatMathTime(seconds: number) { return `0:${String(Math.max(0, seconds)).padStart(2, '0')}` }
