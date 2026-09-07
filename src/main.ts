@@ -48,11 +48,20 @@ app.innerHTML = `
     </video>
     <div class="sky-overlay" aria-hidden="true"></div>
     <div class="sky-grain" aria-hidden="true"></div>
-    <nav class="game-switcher" aria-label="Choose a game">
-      <button class="game-tab is-active" type="button" data-game="word" aria-controls="word-game" aria-pressed="true">Word Siege</button>
-      <button class="game-tab" type="button" data-game="math" aria-controls="math-game" aria-pressed="false">Math Rush</button>
+    <nav class="ps5-menu" aria-label="Choose a game">
+      <div class="ps5-scroll-container">
+        <button class="ps5-game-card" type="button" data-game="word" aria-controls="word-game" aria-pressed="false">
+          <div class="ps5-icon">✦</div>
+          <div class="ps5-title">Word Siege</div>
+        </button>
+        <button class="ps5-game-card" type="button" data-game="math" aria-controls="math-game" aria-pressed="false">
+          <div class="ps5-icon">±</div>
+          <div class="ps5-title">Math Rush</div>
+        </button>
+      </div>
     </nav>
-  <section class="game-card" id="word-game" aria-label="Word Siege typing game">
+  <div class="game-container is-empty">
+  <section class="game-card is-hidden" id="word-game" aria-label="Word Siege typing game">
     <header class="hud"><div class="brand"><span>✦</span> WORD SIEGE</div><div class="stat"><span>Wave</span><strong id="wave">01</strong></div><div class="stat"><span>Cleared</span><strong id="cleared">000 / ${totalWords}</strong></div><div class="stat"><span>Best</span><strong id="best">000</strong></div></header>
     <div class="game-area"><canvas id="game" aria-label="Incoming words game field"></canvas>
       <div class="screen" id="screen"><div class="screen-content"><p class="eyebrow">TYPE TO SURVIVE</p><h1 id="screen-title">WORD SIEGE</h1><p id="screen-message">Destroy each incoming word before it reaches the shield.</p><button id="start" type="button">Start Run</button><p class="help">Type an incoming word exactly. No Enter required.</p></div></div>
@@ -82,7 +91,8 @@ app.innerHTML = `
       <div class="math-progress" aria-hidden="true"><span id="math-progress-fill"></span></div>
     </div>
     <footer class="math-footer"><span>Questions never repeat during this session.</span><button id="math-start" type="button">Start 1-Minute Run</button></footer>
-  </section></main>`
+  </section>
+  </div></main>`
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
 const ctx = canvas.getContext('2d', { alpha: true })!
@@ -99,7 +109,7 @@ const waveInfo = document.querySelector<HTMLElement>('#wave-info')!
 const statusEl = document.querySelector<HTMLElement>('#type-status')!
 const wordGame = document.querySelector<HTMLElement>('#word-game')!
 const mathGame = document.querySelector<HTMLElement>('#math-game')!
-const gameTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.game-tab'))
+const gameTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.ps5-game-card'))
 const mathTimeEl = document.querySelector<HTMLElement>('#math-time')!
 const mathLevelEl = document.querySelector<HTMLElement>('#math-level')!
 const mathScoreEl = document.querySelector<HTMLElement>('#math-score')!
@@ -122,7 +132,7 @@ let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
 let background = ctx.createLinearGradient(0, 0, 0, 1)
-let selectedGame: 'word' | 'math' = 'word'
+let selectedGame: 'word' | 'math' | null = null
 let resizeFrame = 0, lastTypeSoundAt = 0
 const usedMathQuestions = new Set<string>()
 let mathBest = getStoredScore('math-rush-best')
@@ -404,6 +414,19 @@ function submitMathAnswer() {
   updateMathHud(Math.ceil(Math.max(0, 60000 - (performance.now() - mathStartedAt)) / 1000))
 }
 function selectGame(game: 'word' | 'math') {
+  if (selectedGame === game) {
+    if (active && !paused) togglePause()
+    wordGame.classList.add('is-hidden')
+    mathGame.classList.add('is-hidden')
+    gameTabs.forEach((tab) => {
+      tab.classList.remove('is-active')
+      tab.setAttribute('aria-pressed', 'false')
+    })
+    document.querySelector('.game-container')?.classList.add('is-empty')
+    selectedGame = null
+    return
+  }
+
   const showMath = game === 'math'
   if (showMath && active && !paused) togglePause()
   wordGame.classList.toggle('is-hidden', showMath)
@@ -413,6 +436,7 @@ function selectGame(game: 'word' | 'math') {
     tab.classList.toggle('is-active', selected)
     tab.setAttribute('aria-pressed', String(selected))
   })
+  document.querySelector('.game-container')?.classList.remove('is-empty')
   selectedGame = game
   if (!showMath) queueResize()
   if (showMath && mathActive) mathAnswerInput.focus()
