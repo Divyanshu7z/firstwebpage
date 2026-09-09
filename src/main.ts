@@ -58,6 +58,10 @@ app.innerHTML = `
           <div class="ps5-icon">±</div>
           <div class="ps5-title">Math Rush</div>
         </button>
+        <button class="ps5-game-card" type="button" data-game="flappy" aria-controls="flappy-game" aria-pressed="false">
+          <div class="ps5-icon ps5-bird-icon" aria-hidden="true"><svg viewBox="0 0 64 64" focusable="false"><path d="M13 35c3-14 14-22 27-18 6 2 10 7 11 13 5 0 9 1 12 4-4 5-9 8-15 8-3 9-11 14-21 14-10 0-17-7-17-16 0-2 1-4 3-5Z"/><path d="M24 37c6-7 14-7 20-2-7 1-12 5-16 10" class="bird-wing"/><circle cx="40" cy="27" r="2.4" class="bird-eye"/><path d="m52 32 8-3-6 7" class="bird-beak"/></svg></div>
+          <div class="ps5-title">Sky Flap</div>
+        </button>
       </div>
     </nav>
   <div class="game-container is-empty">
@@ -92,6 +96,18 @@ app.innerHTML = `
     </div>
     <footer class="math-footer"><span>Questions never repeat during this session.</span><button id="math-start" type="button">Start 1-Minute Run</button></footer>
   </section>
+  <section class="game-card flappy-card is-hidden" id="flappy-game" aria-label="Sky Flap flying game">
+    <header class="flappy-hud">
+      <div class="brand"><span>◒</span> SKY FLAP</div>
+      <div class="stat"><span>Score</span><strong id="flappy-score">00</strong></div>
+      <div class="stat"><span>Best</span><strong id="flappy-best">00</strong></div>
+    </header>
+    <div class="flappy-area">
+      <canvas id="flappy-canvas" aria-label="Sky Flap game field"></canvas>
+      <div class="flappy-screen" id="flappy-screen"><div class="screen-content"><p class="eyebrow">KEEP YOUR WINGS UP</p><h1 id="flappy-title">SKY FLAP</h1><p id="flappy-message">Fly through the garden gates. Click, tap, or press Space to flap.</p><button id="flappy-start" type="button">Start Flight</button><p class="help">One tap lifts the bird. Each gate is one point.</p></div></div>
+    </div>
+    <footer class="flappy-footer"><span>Click, tap, or press Space to flap.</span><span id="flappy-status" aria-live="polite">READY TO FLY</span></footer>
+  </section>
   </div></main>`
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
@@ -109,6 +125,7 @@ const waveInfo = document.querySelector<HTMLElement>('#wave-info')!
 const statusEl = document.querySelector<HTMLElement>('#type-status')!
 const wordGame = document.querySelector<HTMLElement>('#word-game')!
 const mathGame = document.querySelector<HTMLElement>('#math-game')!
+const flappyGame = document.querySelector<HTMLElement>('#flappy-game')!
 const gameTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.ps5-game-card'))
 const mathTimeEl = document.querySelector<HTMLElement>('#math-time')!
 const mathLevelEl = document.querySelector<HTMLElement>('#math-level')!
@@ -123,6 +140,15 @@ const mathSubmitButton = document.querySelector<HTMLButtonElement>('#math-submit
 const mathStatusEl = document.querySelector<HTMLElement>('#math-status')!
 const mathProgressFill = document.querySelector<HTMLElement>('#math-progress-fill')!
 const mathStartButton = document.querySelector<HTMLButtonElement>('#math-start')!
+const flappyCanvas = document.querySelector<HTMLCanvasElement>('#flappy-canvas')!
+const flappyCtx = flappyCanvas.getContext('2d', { alpha: true })!
+const flappyScreen = document.querySelector<HTMLElement>('#flappy-screen')!
+const flappyTitle = document.querySelector<HTMLElement>('#flappy-title')!
+const flappyMessage = document.querySelector<HTMLElement>('#flappy-message')!
+const flappyStartButton = document.querySelector<HTMLButtonElement>('#flappy-start')!
+const flappyScoreEl = document.querySelector<HTMLElement>('#flappy-score')!
+const flappyBestEl = document.querySelector<HTMLElement>('#flappy-best')!
+const flappyStatusEl = document.querySelector<HTMLElement>('#flappy-status')!
 
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
@@ -132,12 +158,15 @@ let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
 let background = ctx.createLinearGradient(0, 0, 0, 1)
-let selectedGame: 'word' | 'math' | null = null
+let selectedGame: 'word' | 'math' | 'flappy' | null = null
 let resizeFrame = 0, lastTypeSoundAt = 0
 const usedMathQuestions = new Set<string>()
 let mathBest = getStoredScore('math-rush-best')
+let flappyWidth = 0, flappyHeight = 0, flappyScale = 1, flappyActive = false, flappyScore = 0, flappyBest = getStoredScore('sky-flap-best')
+let flappyBird = { y: 0, velocity: 0 }, flappyPipes: { x: number; gapY: number; counted: boolean }[] = [], flappySpawnTimer = 0
 bestEl.textContent = String(best).padStart(3, '0')
 mathBestEl.textContent = String(mathBest).padStart(2, '0')
+flappyBestEl.textContent = String(flappyBest).padStart(2, '0')
 
 function shuffle<T>(items: T[]) { const copy = [...items]; for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]] } return copy }
 function getStoredScore(key: string) { try { const value = Number(localStorage.getItem(key)); return Number.isFinite(value) && value >= 0 ? value : 0 } catch { return 0 } }
@@ -145,6 +174,19 @@ function saveScore(key: string, value: number) { try { localStorage.setItem(key,
 function makeStar(randomY = false): Star { const alpha = .12 + Math.random() * .42; return { x: Math.random() * width, y: randomY ? Math.random() * height : -5, speed: 10 + Math.random() * 22, size: .5 + Math.random() * 1.4, color: `rgba(255, 237, 215, ${alpha})` } }
 function resize() { const rect = canvas.parentElement!.getBoundingClientRect(); scale = Math.min(devicePixelRatio || 1, 1.5); width = Math.max(320, rect.width); height = Math.max(580, Math.min(width * .9, innerHeight * .8)); canvas.width = width * scale; canvas.height = height * scale; canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; ctx.setTransform(scale, 0, 0, scale, 0, 0); background = ctx.createLinearGradient(0, 0, 0, height); background.addColorStop(0, 'rgba(255, 255, 255, .08)'); background.addColorStop(.62, 'rgba(16, 9, 4, .12)'); background.addColorStop(1, 'rgba(10, 5, 3, .22)'); stars = Array.from({ length: Math.ceil(width / 16) }, () => makeStar(true)) }
 function queueResize() { if (selectedGame !== 'word' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resize() }) }
+function resizeFlappy() {
+  const rect = flappyCanvas.parentElement!.getBoundingClientRect()
+  flappyScale = Math.min(devicePixelRatio || 1, 1.5)
+  flappyWidth = Math.max(320, rect.width)
+  flappyHeight = Math.max(430, Math.min(flappyWidth * .72, innerHeight * .68))
+  flappyCanvas.width = flappyWidth * flappyScale
+  flappyCanvas.height = flappyHeight * flappyScale
+  flappyCanvas.style.width = `${flappyWidth}px`
+  flappyCanvas.style.height = `${flappyHeight}px`
+  flappyCtx.setTransform(flappyScale, 0, 0, flappyScale, 0, 0)
+  if (!flappyActive) flappyBird.y = flappyHeight * .48
+}
+function queueFlappyResize() { if (selectedGame !== 'flappy' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resizeFlappy(); drawFlappy() }) }
 function getAudio() { audioContext ??= new AudioContext(); if (audioContext.state === 'suspended') void audioContext.resume(); return audioContext }
 function tone(start: number, duration: number, type: OscillatorType, end: number, volume = .04) { const audio = getAudio(), now = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain(); osc.type = type; osc.frequency.setValueAtTime(start, now); osc.frequency.exponentialRampToValueAtTime(end, now + duration); gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.001, now + duration); osc.connect(gain).connect(audio.destination); osc.start(now); osc.stop(now + duration) }
 function typeSound() {
@@ -186,7 +228,7 @@ function beginWave() { waveSize = wave === 1 ? 1 : Math.min(wave * 10, wordBank.
 function startGame() { getAudio(); deck = shuffle(wordBank); deckIndex = 0; wave = 1; cleared = 0; incoming = []; speedBursts = []; wordTypeStartedAt = 0; active = true; paused = false; input.disabled = false; input.value = ''; screen.classList.add('hidden'); pauseButton.textContent = 'Ⅱ'; pauseButton.setAttribute('aria-pressed', 'false'); pauseButton.setAttribute('aria-label', 'Pause game'); beginWave(); input.focus() }
 function endGame(victory = false) { active = false; input.disabled = true; title.textContent = victory ? 'ALL CLEAR' : 'SHIELD BREACHED'; message.textContent = victory ? `You cleared all ${totalWords} words.` : `You cleared ${cleared} of ${totalWords} words.`; startButton.textContent = victory ? 'New Run' : 'Try Again'; screen.classList.remove('hidden'); statusEl.textContent = victory ? 'VICTORY' : 'GAME OVER' }
 function togglePause() { if (!active) return; paused = !paused; pauseButton.textContent = paused ? '▶' : 'Ⅱ'; pauseButton.setAttribute('aria-pressed', String(paused)); pauseButton.setAttribute('aria-label', paused ? 'Resume game' : 'Pause game'); if (paused) { title.textContent = 'PAUSED'; message.textContent = 'Your shield is holding.'; startButton.textContent = 'Resume'; screen.classList.remove('hidden'); input.blur() } else { screen.classList.add('hidden'); input.focus() } }
-function spawnWord() { const word = deck[deckIndex++]; const fontSize = width < 520 ? 18 : 22; ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`; const margin = Math.min(width * .15, ctx.measureText(word.toUpperCase()).width / 2 + 16); incoming.push({ word, x: margin + Math.random() * Math.max(1, width - margin * 2), y: -24, speed: 20 + wave * 5 + Math.random() * 11 }) ; spawned++ }
+function spawnWord() { const word = deck[deckIndex++]; const fontSize = width < 520 ? 23 : 29; ctx.font = `700 ${fontSize}px Inter, ui-sans-serif, sans-serif`; const margin = Math.min(width * .15, ctx.measureText(word.toUpperCase()).width / 2 + 34); incoming.push({ word, x: margin + Math.random() * Math.max(1, width - margin * 2), y: -24, speed: 20 + wave * 5 + Math.random() * 11 }) ; spawned++ }
 function targetFor(text: string) { let target: IncomingWord | undefined; for (const item of incoming) if (item.word.startsWith(text) && (!target || item.y > target.y)) target = item; return target }
 function checkInput() {
   if (!active || paused) return
@@ -235,26 +277,12 @@ function update(dt: number) {
   if (spawned === waveSize && incoming.length === 0 && cleared < wordBank.length) { nextWaveTimer = 1.1; statusEl.textContent = 'WAVE CLEARED' }
 }
 function drawWord(item: IncomingWord) {
-  const typed = input.value
-  const fontSize = width < 520 ? 18 : 22
-  ctx.font = `500 ${fontSize}px Inter, ui-sans-serif, sans-serif`
+  const fontSize = width < 520 ? 23 : 29
+  const text = item.word.toUpperCase()
+  ctx.font = `700 ${fontSize}px Inter, ui-sans-serif, sans-serif`
   ctx.textAlign = 'center'
-  const match = typed && item.word.startsWith(typed)
-  ctx.shadowBlur = 0
-  ctx.fillStyle = '#4a4a4a'
-  ctx.fillText(item.word.toUpperCase(), item.x, item.y)
-  if (match) {
-    const left = ctx.measureText(item.word.slice(0, typed.length).toUpperCase()).width
-    const total = ctx.measureText(item.word.toUpperCase()).width
-    ctx.strokeStyle = '#4a4a4a'
-    ctx.lineWidth = 1
-    ctx.setLineDash([4, 4])
-    ctx.beginPath()
-    ctx.moveTo(item.x - total / 2, item.y + 7)
-    ctx.lineTo(item.x - total / 2 + left, item.y + 7)
-    ctx.stroke()
-    ctx.setLineDash([])
-  }
+  ctx.fillStyle = '#ffedd7'
+  ctx.fillText(text, item.x, item.y)
 }
 function drawSpeedBurst(burst: SpeedBurst) {
   const alpha = Math.max(0, 1 - burst.age)
@@ -413,11 +441,139 @@ function submitMathAnswer() {
   showMathQuestion()
   updateMathHud(Math.ceil(Math.max(0, 60000 - (performance.now() - mathStartedAt)) / 1000))
 }
-function selectGame(game: 'word' | 'math') {
+
+function updateFlappyHud() {
+  flappyScoreEl.textContent = String(flappyScore).padStart(2, '0')
+  if (flappyScore > flappyBest) {
+    flappyBest = flappyScore
+    flappyBestEl.textContent = String(flappyBest).padStart(2, '0')
+    saveScore('sky-flap-best', flappyBest)
+  }
+}
+function startFlappyGame() {
+  getAudio()
+  flappyActive = true
+  flappyScore = 0
+  flappyBird = { y: flappyHeight * .48, velocity: -315 }
+  flappyPipes = []
+  flappySpawnTimer = .85
+  flappyStatusEl.textContent = 'FLYING'
+  flappyScreen.classList.add('hidden')
+  updateFlappyHud()
+}
+function endFlappyGame() {
+  if (!flappyActive) return
+  flappyActive = false
+  breachSound()
+  flappyTitle.textContent = 'FLIGHT OVER'
+  flappyMessage.textContent = `You passed ${flappyScore} ${flappyScore === 1 ? 'gate' : 'gates'}. Tap start to fly again.`
+  flappyStartButton.textContent = 'Fly Again'
+  flappyStatusEl.textContent = 'READY TO RETRY'
+  flappyScreen.classList.remove('hidden')
+}
+function flap() {
+  if (!flappyActive) return
+  flappyBird.velocity = -315
+  tone(340, .09, 'sine', 510, .016)
+}
+function updateFlappy(dt: number) {
+  if (!flappyActive) return
+  const birdRadius = Math.max(14, Math.min(19, flappyWidth * .025))
+  const pipeWidth = Math.max(66, flappyWidth * .09)
+  const gap = Math.max(148, Math.min(190, flappyHeight * .34))
+  const speed = 150 + Math.min(flappyScore * 4, 55)
+  flappyBird.velocity += 890 * dt
+  flappyBird.y += flappyBird.velocity * dt
+  flappySpawnTimer -= dt
+  if (flappySpawnTimer <= 0) {
+    const pad = gap / 2 + 50
+    flappyPipes.push({ x: flappyWidth + pipeWidth, gapY: randomInt(Math.ceil(pad), Math.floor(flappyHeight - pad)), counted: false })
+    flappySpawnTimer = Math.max(1.12, 1.55 - flappyScore * .012)
+  }
+  for (const pipe of flappyPipes) {
+    pipe.x -= speed * dt
+    if (!pipe.counted && pipe.x + pipeWidth < flappyWidth * .28 - birdRadius) {
+      pipe.counted = true
+      flappyScore++
+      clearSound()
+      updateFlappyHud()
+    }
+  }
+  flappyPipes = flappyPipes.filter((pipe) => pipe.x + pipeWidth > -8)
+  const birdX = flappyWidth * .28
+  const collided = flappyBird.y - birdRadius < 0 || flappyBird.y + birdRadius > flappyHeight || flappyPipes.some((pipe) => {
+    const overlapsX = birdX + birdRadius > pipe.x && birdX - birdRadius < pipe.x + pipeWidth
+    return overlapsX && (flappyBird.y - birdRadius < pipe.gapY - gap / 2 || flappyBird.y + birdRadius > pipe.gapY + gap / 2)
+  })
+  if (collided) endFlappyGame()
+}
+function drawFlappyCloud(x: number, y: number, size: number) {
+  flappyCtx.beginPath()
+  flappyCtx.arc(x, y, size * .32, Math.PI, 0)
+  flappyCtx.arc(x + size * .32, y - size * .14, size * .38, Math.PI, 0)
+  flappyCtx.arc(x + size * .7, y, size * .28, Math.PI, 0)
+  flappyCtx.lineTo(x + size, y + size * .26)
+  flappyCtx.lineTo(x, y + size * .26)
+  flappyCtx.closePath()
+  flappyCtx.fill()
+}
+function drawFlappy() {
+  if (!flappyWidth || !flappyHeight) return
+  const ctx = flappyCtx, birdX = flappyWidth * .28
+  const birdRadius = Math.max(14, Math.min(19, flappyWidth * .025))
+  const pipeWidth = Math.max(66, flappyWidth * .09)
+  const gap = Math.max(148, Math.min(190, flappyHeight * .34))
+  const sky = ctx.createLinearGradient(0, 0, 0, flappyHeight)
+  sky.addColorStop(0, 'rgba(255, 237, 215, .22)')
+  sky.addColorStop(.55, 'rgba(169, 197, 183, .16)')
+  sky.addColorStop(1, 'rgba(56, 36, 22, .32)')
+  ctx.clearRect(0, 0, flappyWidth, flappyHeight)
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, flappyWidth, flappyHeight)
+  ctx.fillStyle = 'rgba(255, 255, 255, .11)'
+  drawFlappyCloud(flappyWidth * .12, flappyHeight * .18, 90)
+  drawFlappyCloud(flappyWidth * .67, flappyHeight * .31, 70)
+  ctx.fillStyle = 'rgba(16, 9, 4, .18)'
+  ctx.fillRect(0, flappyHeight - 19, flappyWidth, 19)
+  for (const pipe of flappyPipes) {
+    const upperHeight = pipe.gapY - gap / 2
+    const lowerY = pipe.gapY + gap / 2
+    ctx.fillStyle = '#596744'
+    ctx.fillRect(pipe.x, 0, pipeWidth, upperHeight)
+    ctx.fillRect(pipe.x, lowerY, pipeWidth, flappyHeight - lowerY)
+    ctx.fillStyle = 'rgba(255, 237, 215, .24)'
+    ctx.fillRect(pipe.x + 8, 0, 6, upperHeight)
+    ctx.fillRect(pipe.x + 8, lowerY, 6, flappyHeight - lowerY)
+    ctx.fillStyle = '#788658'
+    ctx.fillRect(pipe.x - 7, upperHeight - 17, pipeWidth + 14, 17)
+    ctx.fillRect(pipe.x - 7, lowerY, pipeWidth + 14, 17)
+  }
+  ctx.save()
+  ctx.translate(birdX, flappyBird.y)
+  ctx.rotate(Math.max(-.42, Math.min(.72, flappyBird.velocity / 620)))
+  ctx.fillStyle = '#dc5000'
+  ctx.beginPath(); ctx.arc(0, 0, birdRadius, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = '#ffedd7'
+  ctx.beginPath(); ctx.ellipse(-birdRadius * .2, birdRadius * .25, birdRadius * .78, birdRadius * .42, -.35, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = '#382416'
+  ctx.beginPath(); ctx.arc(birdRadius * .35, -birdRadius * .32, birdRadius * .15, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = '#ffcf75'
+  ctx.beginPath(); ctx.moveTo(birdRadius * .8, 0); ctx.lineTo(birdRadius * 1.48, birdRadius * .18); ctx.lineTo(birdRadius * .82, birdRadius * .36); ctx.closePath(); ctx.fill()
+  ctx.restore()
+  if (flappyActive) {
+    ctx.fillStyle = 'rgba(255, 237, 215, .92)'
+    ctx.font = '500 38px Inter, ui-sans-serif, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(String(flappyScore), flappyWidth / 2, 62)
+  }
+}
+
+function selectGame(game: 'word' | 'math' | 'flappy') {
   if (selectedGame === game) {
     if (active && !paused) togglePause()
     wordGame.classList.add('is-hidden')
     mathGame.classList.add('is-hidden')
+    flappyGame.classList.add('is-hidden')
     gameTabs.forEach((tab) => {
       tab.classList.remove('is-active')
       tab.setAttribute('aria-pressed', 'false')
@@ -427,10 +583,13 @@ function selectGame(game: 'word' | 'math') {
     return
   }
 
+  const showWord = game === 'word'
   const showMath = game === 'math'
-  if (showMath && active && !paused) togglePause()
-  wordGame.classList.toggle('is-hidden', showMath)
+  const showFlappy = game === 'flappy'
+  if (!showWord && active && !paused) togglePause()
+  wordGame.classList.toggle('is-hidden', !showWord)
   mathGame.classList.toggle('is-hidden', !showMath)
+  flappyGame.classList.toggle('is-hidden', !showFlappy)
   gameTabs.forEach((tab) => {
     const selected = tab.dataset.game === game
     tab.classList.toggle('is-active', selected)
@@ -438,10 +597,11 @@ function selectGame(game: 'word' | 'math') {
   })
   document.querySelector('.game-container')?.classList.remove('is-empty')
   selectedGame = game
-  if (!showMath) queueResize()
+  if (showWord) queueResize()
   if (showMath && mathActive) mathAnswerInput.focus()
+  if (showFlappy) { resizeFlappy(); drawFlappy() }
 }
-function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; if (selectedGame === 'word') { update(dt); draw() }; updateMathTimer(now); requestAnimationFrame(frame) }
+function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; if (selectedGame === 'word') { update(dt); draw() }; if (selectedGame === 'flappy') { updateFlappy(dt); drawFlappy() }; updateMathTimer(now); requestAnimationFrame(frame) }
 
 input.addEventListener('input', checkInput)
 input.addEventListener('keydown', (event) => { if (event.key === 'Escape') togglePause(); if (event.key === ' ') event.preventDefault() })
@@ -450,6 +610,14 @@ startButton.addEventListener('click', () => active && paused ? togglePause() : s
 pauseButton.addEventListener('click', togglePause)
 mathAnswerForm.addEventListener('submit', (event) => { event.preventDefault(); submitMathAnswer() })
 mathStartButton.addEventListener('click', startMathGame)
-gameTabs.forEach((tab) => tab.addEventListener('click', () => selectGame(tab.dataset.game === 'math' ? 'math' : 'word')))
-window.addEventListener('resize', queueResize)
-resize(); updateHud(); updateWaveInfo(); requestAnimationFrame(frame)
+flappyStartButton.addEventListener('click', startFlappyGame)
+flappyCanvas.addEventListener('pointerdown', (event) => { event.preventDefault(); flap() })
+gameTabs.forEach((tab) => tab.addEventListener('click', () => {
+  const game = tab.dataset.game
+  selectGame(game === 'math' ? 'math' : game === 'flappy' ? 'flappy' : 'word')
+}))
+window.addEventListener('keydown', (event) => {
+  if (selectedGame === 'flappy' && event.code === 'Space') { event.preventDefault(); flap() }
+})
+window.addEventListener('resize', () => { queueResize(); queueFlappyResize() })
+resize(); resizeFlappy(); updateHud(); updateWaveInfo(); updateFlappyHud(); requestAnimationFrame(frame)

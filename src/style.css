@@ -119,6 +119,10 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
   color: var(--color-warm-cream);
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
+.ps5-bird-icon svg { width: 67px; height: 67px; overflow: visible; fill: var(--color-ember-accent); filter: drop-shadow(0 5px 8px rgba(16, 9, 4, .3)); }
+.ps5-bird-icon .bird-wing { fill: var(--color-warm-cream); opacity: .9; }
+.ps5-bird-icon .bird-eye { fill: var(--color-walnut-shadow); }
+.ps5-bird-icon .bird-beak { fill: #ffcf75; }
 .ps5-game-card.is-active .ps5-icon {
   border-color: rgba(255, 255, 255, 0.7);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
@@ -200,7 +204,7 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
   content: '';
   pointer-events: none;
 }
-.hud, .math-hud {
+.hud, .math-hud, .flappy-hud {
   position: relative;
   z-index: 1;
   display: flex;
@@ -378,7 +382,7 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
   text-transform: uppercase;
 }
 
-.footer, .math-footer {
+.footer, .math-footer, .flappy-footer {
   position: relative;
   z-index: 1;
   display: flex;
@@ -523,6 +527,33 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
 .math-question.is-correct { animation: math-pop .24s ease-out; }
 .math-question.is-wrong { animation: math-shake .28s ease-in-out; }
 .math-footer button { margin-left: auto; font-size: 12px; }
+.flappy-area {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  min-height: 430px;
+  background: rgba(255, 255, 255, .04);
+  line-height: 0;
+}
+.flappy-area canvas { display: block; max-width: 100%; cursor: pointer; touch-action: manipulation; }
+.flappy-screen {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(255, 255, 255, .04);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  text-align: left;
+  line-height: 1.4;
+  transition: opacity .25s ease, visibility .25s ease;
+}
+.flappy-screen.hidden { visibility: hidden; opacity: 0; pointer-events: none; }
+.flappy-screen #flappy-start { cursor: pointer; border: 1px solid rgba(255, 255, 255, .4); border-radius: var(--radius-buttons-pill); padding: 14px 24px; color: var(--color-warm-cream); background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 237, 215, .08)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 10px 24px rgba(0, 0, 0, .16); font-size: 12px; font-weight: 500; text-transform: uppercase; }
+.flappy-screen #flappy-start:hover { opacity: .92; transform: translateY(-1px); }
+.flappy-footer span + span { margin-left: auto; color: var(--color-ember-accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm-cream); outline-offset: 4px; }
 @keyframes math-pop { 50% { color: var(--color-warm-cream); transform: scale(1.045); } }
@@ -532,7 +563,7 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   .game-shell { display: flex; flex-direction: column; padding: 40px 0 0 0; min-height: 100vh; justify-content: flex-start; }
   .game-card { flex: 1; border: 0; border-radius: 0; min-height: 0; }
   .game-card::before { right: 25%; left: 25%; }
-  .hud, .math-hud { min-height: 68px; padding: 10px 14px; gap: 14px; }
+  .hud, .math-hud, .flappy-hud { min-height: 68px; padding: 10px 14px; gap: 14px; }
   .brand { font-size: 18px; }
   .brand span { width: 23px; height: 23px; font-size: 13px; }
   .stat:nth-of-type(2) { display: none; }
@@ -552,6 +583,9 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   .math-footer { min-height: 70px; padding: 12px 14px; }
   .math-footer > span { display: none; }
   .math-footer button { width: 100%; margin-left: 0; }
+  .flappy-area { min-height: calc(100vh - 138px); }
+  .flappy-footer { min-height: 51px; padding: 8px 14px; }
+  .flappy-footer span:first-child { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
