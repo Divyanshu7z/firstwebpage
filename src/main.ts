@@ -5,6 +5,7 @@ type Star = { x: number; y: number; speed: number; size: number; color: string }
 type SpeedBurst = { x: number; y: number; wpm: number; age: number }
 type MathOperation = '+' | '−' | '×'
 type MathQuestion = { left: number; right: number; operation: MathOperation; answer: number; key: string }
+type CoinSide = 'heads' | 'tails'
 
 // Standalone words only: no generated compounds, repeated stems, or near-identical variants.
 const wordBank = [
@@ -62,6 +63,14 @@ app.innerHTML = `
           <div class="ps5-icon ps5-bird-icon" aria-hidden="true"><svg viewBox="0 0 64 64" focusable="false"><path d="M13 35c3-14 14-22 27-18 6 2 10 7 11 13 5 0 9 1 12 4-4 5-9 8-15 8-3 9-11 14-21 14-10 0-17-7-17-16 0-2 1-4 3-5Z"/><path d="M24 37c6-7 14-7 20-2-7 1-12 5-16 10" class="bird-wing"/><circle cx="40" cy="27" r="2.4" class="bird-eye"/><path d="m52 32 8-3-6 7" class="bird-beak"/></svg></div>
           <div class="ps5-title">Sky Flap</div>
         </button>
+        <button class="ps5-game-card" type="button" data-game="coin" aria-controls="coin-game" aria-pressed="false">
+          <div class="ps5-icon">🪙</div>
+          <div class="ps5-title">Coin Toss</div>
+        </button>
+        <button class="ps5-game-card" type="button" data-game="dice" aria-controls="dice-game" aria-pressed="false">
+          <div class="ps5-icon">🎲</div>
+          <div class="ps5-title">Dice Roll</div>
+        </button>
       </div>
     </nav>
   <div class="game-container is-empty">
@@ -108,6 +117,57 @@ app.innerHTML = `
     </div>
     <footer class="flappy-footer"><span>Click, tap, or press Space to flap.</span><span id="flappy-status" aria-live="polite">READY TO FLY</span></footer>
   </section>
+  <section class="game-card coin-card is-hidden" id="coin-game" aria-label="Coin Toss game">
+    <header class="hud">
+      <div class="brand"><span>✦</span> COIN TOSS</div>
+      <div class="stat"><span>Heads</span><strong id="coin-heads-count">0</strong></div>
+      <div class="stat"><span>Tails</span><strong id="coin-tails-count">0</strong></div>
+      <div class="stat"><span>Streak</span><strong id="coin-streak">0</strong></div>
+      <div class="stat"><span>Best</span><strong id="coin-best">0</strong></div>
+    </header>
+    <div class="coin-area">
+      <div class="coin-glow coin-glow-one"></div><div class="coin-glow coin-glow-two"></div>
+      <p class="coin-status" id="coin-status">PICK A SIDE AND FLIP</p>
+      <div class="coin-scene">
+        <div class="coin-body" id="coin-body">
+          <div class="coin-face coin-heads">✦</div>
+          <div class="coin-face coin-tails">◈</div>
+        </div>
+      </div>
+      <div class="coin-result" id="coin-result"></div>
+      <div class="coin-pick-row">
+        <button class="coin-pick-btn" type="button" data-pick="heads" id="pick-heads">Heads</button>
+        <button class="coin-pick-btn" type="button" data-pick="tails" id="pick-tails">Tails</button>
+      </div>
+    </div>
+    <footer class="footer coin-footer"><span>Pick a side, then flip the coin.</span><span id="coin-total">Total flips: 0</span></footer>
+  </section>
+  <section class="game-card dice-card is-hidden" id="dice-game" aria-label="Dice Roll game">
+    <header class="hud">
+      <div class="brand"><span>✦</span> DICE ROLL</div>
+      <div class="stat"><span>Rolls</span><strong id="dice-rolls-count">0</strong></div>
+      <div class="stat"><span>Last</span><strong id="dice-last">—</strong></div>
+      <div class="stat"><span>Best 6-Streak</span><strong id="dice-best">0</strong></div>
+    </header>
+    <div class="dice-area">
+      <div class="dice-glow dice-glow-one"></div><div class="dice-glow dice-glow-two"></div>
+      <p class="dice-status" id="dice-status">PRESS ROLL TO START</p>
+      <div class="dice-scene">
+        <div class="dice-cube" id="dice-cube">
+          <div class="dice-face dice-face-1"><div class="dice-pip"></div></div>
+          <div class="dice-face dice-face-2"><div class="dice-pip"></div><div class="dice-pip"></div></div>
+          <div class="dice-face dice-face-3"><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div></div>
+          <div class="dice-face dice-face-4"><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div></div>
+          <div class="dice-face dice-face-5"><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div></div>
+          <div class="dice-face dice-face-6"><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div><div class="dice-pip"></div></div>
+        </div>
+      </div>
+      <div class="dice-value" id="dice-value"></div>
+      <button class="dice-roll-btn" type="button" id="dice-roll-btn">Roll Dice</button>
+      <div class="dice-history" id="dice-history"><span class="dice-history-label">History</span></div>
+    </div>
+    <footer class="footer dice-footer"><span>Roll the dice and test your luck.</span><span id="dice-total-status" aria-live="polite">READY</span></footer>
+  </section>
   </div></main>`
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
@@ -149,6 +209,27 @@ const flappyStartButton = document.querySelector<HTMLButtonElement>('#flappy-sta
 const flappyScoreEl = document.querySelector<HTMLElement>('#flappy-score')!
 const flappyBestEl = document.querySelector<HTMLElement>('#flappy-best')!
 const flappyStatusEl = document.querySelector<HTMLElement>('#flappy-status')!
+const coinGame = document.querySelector<HTMLElement>('#coin-game')!
+const coinBody = document.querySelector<HTMLElement>('#coin-body')!
+const coinResultEl = document.querySelector<HTMLElement>('#coin-result')!
+const coinStatusEl = document.querySelector<HTMLElement>('#coin-status')!
+const coinHeadsCountEl = document.querySelector<HTMLElement>('#coin-heads-count')!
+const coinTailsCountEl = document.querySelector<HTMLElement>('#coin-tails-count')!
+const coinStreakEl = document.querySelector<HTMLElement>('#coin-streak')!
+const coinBestEl = document.querySelector<HTMLElement>('#coin-best')!
+const coinTotalEl = document.querySelector<HTMLElement>('#coin-total')!
+const pickHeadsBtn = document.querySelector<HTMLButtonElement>('#pick-heads')!
+const pickTailsBtn = document.querySelector<HTMLButtonElement>('#pick-tails')!
+const diceGame = document.querySelector<HTMLElement>('#dice-game')!
+const diceCube = document.querySelector<HTMLElement>('#dice-cube')!
+const diceValueEl = document.querySelector<HTMLElement>('#dice-value')!
+const diceStatusEl = document.querySelector<HTMLElement>('#dice-status')!
+const diceRollsCountEl = document.querySelector<HTMLElement>('#dice-rolls-count')!
+const diceLastEl = document.querySelector<HTMLElement>('#dice-last')!
+const diceBestEl = document.querySelector<HTMLElement>('#dice-best')!
+const diceRollBtn = document.querySelector<HTMLButtonElement>('#dice-roll-btn')!
+const diceHistoryEl = document.querySelector<HTMLElement>('#dice-history')!
+const diceTotalStatusEl = document.querySelector<HTMLElement>('#dice-total-status')!
 
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
@@ -158,15 +239,18 @@ let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
 let background = ctx.createLinearGradient(0, 0, 0, 1)
-let selectedGame: 'word' | 'math' | 'flappy' | null = null
+let selectedGame: 'word' | 'math' | 'flappy' | 'coin' | 'dice' | null = null
 let resizeFrame = 0, lastTypeSoundAt = 0
 const usedMathQuestions = new Set<string>()
 let mathBest = getStoredScore('math-rush-best')
 let flappyWidth = 0, flappyHeight = 0, flappyScale = 1, flappyActive = false, flappyScore = 0, flappyBest = getStoredScore('sky-flap-best')
 let flappyBird = { y: 0, velocity: 0 }, flappyPipes: { x: number; gapY: number; counted: boolean }[] = [], flappySpawnTimer = 0
+let coinFlipping = false, coinPick: CoinSide | null = null, coinHeadsCount = 0, coinTailsCount = 0, coinStreak = 0, coinBestStreak = getStoredScore('coin-toss-best')
+let diceRolling = false, diceRollCount = 0, diceSixStreak = 0, diceBestSixStreak = getStoredScore('dice-roll-best'), diceHistory: number[] = []
 bestEl.textContent = String(best).padStart(3, '0')
 mathBestEl.textContent = String(mathBest).padStart(2, '0')
 flappyBestEl.textContent = String(flappyBest).padStart(2, '0')
+coinBestEl.textContent = String(coinBestStreak)
 
 function shuffle<T>(items: T[]) { const copy = [...items]; for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]] } return copy }
 function getStoredScore(key: string) { try { const value = Number(localStorage.getItem(key)); return Number.isFinite(value) && value >= 0 ? value : 0 } catch { return 0 } }
@@ -568,12 +652,243 @@ function drawFlappy() {
   }
 }
 
-function selectGame(game: 'word' | 'math' | 'flappy') {
+// ── Coin Toss ──
+function coinFlipSound() {
+  const audio = getAudio(), now = audio.currentTime
+  // Metallic ping
+  const osc = audio.createOscillator(), gain = audio.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(1200, now)
+  osc.frequency.exponentialRampToValueAtTime(2400, now + .06)
+  osc.frequency.exponentialRampToValueAtTime(800, now + .15)
+  gain.gain.setValueAtTime(.03, now)
+  gain.gain.exponentialRampToValueAtTime(.001, now + .2)
+  osc.connect(gain).connect(audio.destination)
+  osc.start(now); osc.stop(now + .2)
+  // Whoosh
+  const dur = .35
+  const buf = audio.createBuffer(1, Math.floor(audio.sampleRate * dur), audio.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 3)
+  const noise = audio.createBufferSource()
+  noise.buffer = buf
+  const filter = audio.createBiquadFilter()
+  filter.type = 'highpass'
+  filter.frequency.value = 600
+  const noiseGain = audio.createGain()
+  noiseGain.gain.setValueAtTime(.015, now)
+  noiseGain.gain.exponentialRampToValueAtTime(.001, now + dur)
+  noise.connect(filter).connect(noiseGain).connect(audio.destination)
+  noise.start(now)
+}
+function coinLandSound(won: boolean) {
+  const audio = getAudio(), now = audio.currentTime
+  if (won) {
+    // Cheerful chime
+    const notes = [523, 659, 784]
+    notes.forEach((freq, i) => {
+      const osc = audio.createOscillator(), gain = audio.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, now + i * .08)
+      gain.gain.setValueAtTime(.025, now + i * .08)
+      gain.gain.exponentialRampToValueAtTime(.001, now + i * .08 + .2)
+      osc.connect(gain).connect(audio.destination)
+      osc.start(now + i * .08); osc.stop(now + i * .08 + .22)
+    })
+  } else {
+    // Dull thud
+    tone(180, .25, 'sine', 80, .03)
+  }
+}
+function updateCoinHud() {
+  coinHeadsCountEl.textContent = String(coinHeadsCount)
+  coinTailsCountEl.textContent = String(coinTailsCount)
+  coinStreakEl.textContent = String(coinStreak)
+  coinTotalEl.textContent = `Total flips: ${coinHeadsCount + coinTailsCount}`
+  if (coinStreak > coinBestStreak) {
+    coinBestStreak = coinStreak
+    coinBestEl.textContent = String(coinBestStreak)
+    saveScore('coin-toss-best', coinBestStreak)
+  }
+}
+function selectCoinPick(side: CoinSide) {
+  if (coinFlipping) return
+  coinPick = side
+  pickHeadsBtn.classList.toggle('is-selected', side === 'heads')
+  pickTailsBtn.classList.toggle('is-selected', side === 'tails')
+  coinStatusEl.textContent = `YOU PICKED ${side.toUpperCase()} — CLICK AGAIN TO FLIP`
+}
+function flipCoin() {
+  if (coinFlipping || !coinPick) return
+  coinFlipping = true
+  getAudio()
+  coinFlipSound()
+  pickHeadsBtn.disabled = true
+  pickTailsBtn.disabled = true
+  coinResultEl.classList.remove('is-visible', 'is-win', 'is-loss')
+  coinStatusEl.textContent = 'FLIPPING…'
+
+  const result: CoinSide = Math.random() < .5 ? 'heads' : 'tails'
+
+  // Reset animation
+  coinBody.classList.remove('is-flipping', 'is-flipping-tails')
+  void coinBody.offsetWidth
+  coinBody.classList.add(result === 'heads' ? 'is-flipping' : 'is-flipping-tails')
+
+  setTimeout(() => {
+    coinFlipping = false
+    pickHeadsBtn.disabled = false
+    pickTailsBtn.disabled = false
+
+    if (result === 'heads') coinHeadsCount++
+    else coinTailsCount++
+
+    const won = result === coinPick
+    if (won) {
+      coinStreak++
+      coinLandSound(true)
+      coinResultEl.textContent = `${result.toUpperCase()} — YOU WIN!`
+      coinResultEl.classList.add('is-win')
+      coinStatusEl.textContent = `🔥 STREAK: ${coinStreak}`
+    } else {
+      coinStreak = 0
+      coinLandSound(false)
+      coinResultEl.textContent = `${result.toUpperCase()} — YOU LOSE`
+      coinResultEl.classList.add('is-loss')
+      coinStatusEl.textContent = 'STREAK RESET — TRY AGAIN'
+    }
+    coinResultEl.classList.add('is-visible')
+    updateCoinHud()
+  }, 1150)
+}
+
+// ── Dice Roll ──
+function diceRollSound() {
+  const audio = getAudio(), now = audio.currentTime
+  // Rattling rumble
+  for (let i = 0; i < 4; i++) {
+    const t = now + i * .08
+    const dur = .12
+    const buf = audio.createBuffer(1, Math.floor(audio.sampleRate * dur), audio.sampleRate)
+    const data = buf.getChannelData(0)
+    for (let j = 0; j < data.length; j++) data[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / data.length, 4)
+    const noise = audio.createBufferSource()
+    noise.buffer = buf
+    const filter = audio.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 500 + i * 200
+    const g = audio.createGain()
+    g.gain.setValueAtTime(.02, t)
+    g.gain.exponentialRampToValueAtTime(.001, t + dur)
+    noise.connect(filter).connect(g).connect(audio.destination)
+    noise.start(t)
+  }
+  // Tonal knock
+  const osc = audio.createOscillator(), gain = audio.createGain()
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(220, now)
+  osc.frequency.exponentialRampToValueAtTime(110, now + .25)
+  gain.gain.setValueAtTime(.018, now)
+  gain.gain.exponentialRampToValueAtTime(.001, now + .3)
+  osc.connect(gain).connect(audio.destination)
+  osc.start(now); osc.stop(now + .32)
+}
+function diceLandSound() {
+  const audio = getAudio(), now = audio.currentTime
+  // Solid thud
+  const osc = audio.createOscillator(), gain = audio.createGain()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(160, now)
+  osc.frequency.exponentialRampToValueAtTime(60, now + .12)
+  gain.gain.setValueAtTime(.05, now)
+  gain.gain.exponentialRampToValueAtTime(.001, now + .15)
+  osc.connect(gain).connect(audio.destination)
+  osc.start(now); osc.stop(now + .16)
+  // Impact noise
+  const dur = .08
+  const buf = audio.createBuffer(1, Math.floor(audio.sampleRate * dur), audio.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 8)
+  const noise = audio.createBufferSource()
+  noise.buffer = buf
+  const noiseGain = audio.createGain()
+  noiseGain.gain.setValueAtTime(.025, now)
+  noiseGain.gain.exponentialRampToValueAtTime(.001, now + dur)
+  noise.connect(noiseGain).connect(audio.destination)
+  noise.start(now)
+}
+function updateDiceHud() {
+  diceRollsCountEl.textContent = String(diceRollCount)
+}
+function addDiceHistoryItem(value: number) {
+  diceHistory.push(value)
+  if (diceHistory.length > 10) diceHistory.shift()
+  // Rebuild history display
+  const label = diceHistoryEl.querySelector('.dice-history-label')!
+  diceHistoryEl.innerHTML = ''
+  diceHistoryEl.appendChild(label)
+  const pips = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅']
+  for (const v of diceHistory) {
+    const el = document.createElement('span')
+    el.className = 'dice-mini'
+    el.textContent = pips[v]
+    diceHistoryEl.appendChild(el)
+  }
+}
+function rollDice() {
+  if (diceRolling) return
+  diceRolling = true
+  getAudio()
+  diceRollSound()
+  diceRollBtn.disabled = true
+  diceStatusEl.textContent = 'ROLLING…'
+  diceValueEl.textContent = ''
+
+  const result = randomInt(1, 6)
+
+  // Reset and apply animation
+  diceCube.className = 'dice-cube'
+  void diceCube.offsetWidth
+  const animClass = result === 1 ? 'is-rolling' : `is-rolling-${result}`
+  diceCube.classList.add(animClass)
+
+  setTimeout(() => {
+    diceRolling = false
+    diceRollBtn.disabled = false
+    diceRollCount++
+    diceLandSound()
+
+    diceValueEl.textContent = `YOU ROLLED A ${result}`
+    diceLastEl.textContent = String(result)
+
+    if (result === 6) {
+      diceSixStreak++
+      clearSound()
+      diceStatusEl.textContent = `🔥 SIX STREAK: ${diceSixStreak}`
+      if (diceSixStreak > diceBestSixStreak) {
+        diceBestSixStreak = diceSixStreak
+        diceBestEl.textContent = String(diceBestSixStreak)
+        saveScore('dice-roll-best', diceBestSixStreak)
+      }
+    } else {
+      diceSixStreak = 0
+      diceStatusEl.textContent = result >= 4 ? 'NICE ROLL!' : 'BETTER LUCK NEXT TIME'
+    }
+
+    diceTotalStatusEl.textContent = `${diceRollCount} ROLLS`
+    updateDiceHud()
+    addDiceHistoryItem(result)
+  }, 1250)
+}
+
+function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
   if (selectedGame === game) {
     if (active && !paused) togglePause()
     wordGame.classList.add('is-hidden')
     mathGame.classList.add('is-hidden')
     flappyGame.classList.add('is-hidden')
+    coinGame.classList.add('is-hidden')
+    diceGame.classList.add('is-hidden')
     gameTabs.forEach((tab) => {
       tab.classList.remove('is-active')
       tab.setAttribute('aria-pressed', 'false')
@@ -586,10 +901,14 @@ function selectGame(game: 'word' | 'math' | 'flappy') {
   const showWord = game === 'word'
   const showMath = game === 'math'
   const showFlappy = game === 'flappy'
+  const showCoin = game === 'coin'
+  const showDice = game === 'dice'
   if (!showWord && active && !paused) togglePause()
   wordGame.classList.toggle('is-hidden', !showWord)
   mathGame.classList.toggle('is-hidden', !showMath)
   flappyGame.classList.toggle('is-hidden', !showFlappy)
+  coinGame.classList.toggle('is-hidden', !showCoin)
+  diceGame.classList.toggle('is-hidden', !showDice)
   gameTabs.forEach((tab) => {
     const selected = tab.dataset.game === game
     tab.classList.toggle('is-active', selected)
@@ -612,12 +931,22 @@ mathAnswerForm.addEventListener('submit', (event) => { event.preventDefault(); s
 mathStartButton.addEventListener('click', startMathGame)
 flappyStartButton.addEventListener('click', startFlappyGame)
 flappyCanvas.addEventListener('pointerdown', (event) => { event.preventDefault(); flap() })
+pickHeadsBtn.addEventListener('click', () => {
+  if (coinPick === 'heads') flipCoin()
+  else selectCoinPick('heads')
+})
+pickTailsBtn.addEventListener('click', () => {
+  if (coinPick === 'tails') flipCoin()
+  else selectCoinPick('tails')
+})
+diceRollBtn.addEventListener('click', rollDice)
 gameTabs.forEach((tab) => tab.addEventListener('click', () => {
-  const game = tab.dataset.game
-  selectGame(game === 'math' ? 'math' : game === 'flappy' ? 'flappy' : 'word')
+  const game = tab.dataset.game as 'word' | 'math' | 'flappy' | 'coin' | 'dice'
+  if (game === 'word' || game === 'math' || game === 'flappy' || game === 'coin' || game === 'dice') selectGame(game)
 }))
 window.addEventListener('keydown', (event) => {
   if (selectedGame === 'flappy' && event.code === 'Space') { event.preventDefault(); flap() }
+  if (selectedGame === 'dice' && event.code === 'Space') { event.preventDefault(); rollDice() }
 })
 window.addEventListener('resize', () => { queueResize(); queueFlappyResize() })
 resize(); resizeFlappy(); updateHud(); updateWaveInfo(); updateFlappyHud(); requestAnimationFrame(frame)
