@@ -259,10 +259,13 @@ function makeStar(randomY = false): Star { const alpha = .12 + Math.random() * .
 function resize() { const rect = canvas.parentElement!.getBoundingClientRect(); scale = Math.min(devicePixelRatio || 1, 1.5); width = Math.max(320, rect.width); height = Math.max(580, Math.min(width * .9, innerHeight * .8)); canvas.width = width * scale; canvas.height = height * scale; canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; ctx.setTransform(scale, 0, 0, scale, 0, 0); background = ctx.createLinearGradient(0, 0, 0, height); background.addColorStop(0, 'rgba(255, 255, 255, .08)'); background.addColorStop(.62, 'rgba(16, 9, 4, .12)'); background.addColorStop(1, 'rgba(10, 5, 3, .22)'); stars = Array.from({ length: Math.ceil(width / 16) }, () => makeStar(true)) }
 function queueResize() { if (selectedGame !== 'word' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resize() }) }
 function resizeFlappy() {
-  const rect = flappyCanvas.parentElement!.getBoundingClientRect()
+  const parent = flappyCanvas.parentElement!
   flappyScale = Math.min(devicePixelRatio || 1, 1.5)
-  flappyWidth = Math.max(320, rect.width)
-  flappyHeight = Math.max(430, Math.min(flappyWidth * .72, innerHeight * .68))
+  flappyWidth = Math.max(320, parent.clientWidth)
+  // Use actual container height when the card is visible (>100px), fall back to a
+  // computed value when the card is hidden/collapsed inside the grid animation.
+  const measuredH = parent.clientHeight
+  flappyHeight = measuredH > 100 ? measuredH : Math.max(380, Math.min(flappyWidth * .72, innerHeight * .68))
   flappyCanvas.width = flappyWidth * flappyScale
   flappyCanvas.height = flappyHeight * flappyScale
   flappyCanvas.style.width = `${flappyWidth}px`
@@ -270,7 +273,8 @@ function resizeFlappy() {
   flappyCtx.setTransform(flappyScale, 0, 0, flappyScale, 0, 0)
   if (!flappyActive) flappyBird.y = flappyHeight * .48
 }
-function queueFlappyResize() { if (selectedGame !== 'flappy' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; resizeFlappy(); drawFlappy() }) }
+// Double-RAF: first frame commits the flex layout, second frame has real measurements.
+function queueFlappyResize() { if (selectedGame !== 'flappy' || resizeFrame) return; resizeFrame = requestAnimationFrame(() => { requestAnimationFrame(() => { resizeFrame = 0; resizeFlappy(); drawFlappy() }) }) }
 function getAudio() { audioContext ??= new AudioContext(); if (audioContext.state === 'suspended') void audioContext.resume(); return audioContext }
 function tone(start: number, duration: number, type: OscillatorType, end: number, volume = .04) { const audio = getAudio(), now = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain(); osc.type = type; osc.frequency.setValueAtTime(start, now); osc.frequency.exponentialRampToValueAtTime(end, now + duration); gain.gain.setValueAtTime(volume, now); gain.gain.exponentialRampToValueAtTime(.001, now + duration); osc.connect(gain).connect(audio.destination); osc.start(now); osc.stop(now + duration) }
 function typeSound() {
@@ -918,7 +922,7 @@ function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
   selectedGame = game
   if (showWord) queueResize()
   if (showMath && mathActive) mathAnswerInput.focus()
-  if (showFlappy) { resizeFlappy(); drawFlappy() }
+  if (showFlappy) { requestAnimationFrame(() => { requestAnimationFrame(() => { resizeFlappy(); drawFlappy() }) }) }
 }
 function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; if (selectedGame === 'word') { update(dt); draw() }; if (selectedGame === 'flappy') { updateFlappy(dt); drawFlappy() }; updateMathTimer(now); requestAnimationFrame(frame) }
 

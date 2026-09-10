@@ -176,6 +176,11 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
   opacity: 1;
   visibility: visible;
 }
+.flappy-card {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
 .game-card.is-hidden {
   opacity: 0;
   transform: scale(0.7) translateY(40px);
@@ -531,11 +536,12 @@ button, input { font: inherit; } button { -webkit-tap-highlight-color: transpare
   position: relative;
   z-index: 1;
   overflow: hidden;
-  min-height: 430px;
+  flex: 1;
+  min-height: 380px;
   background: rgba(255, 255, 255, .04);
   line-height: 0;
 }
-.flappy-area canvas { display: block; max-width: 100%; cursor: pointer; touch-action: manipulation; }
+.flappy-area canvas { display: block; cursor: pointer; touch-action: manipulation; }
 .flappy-screen {
   position: absolute;
   z-index: 2;
@@ -931,7 +937,7 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   .math-footer { min-height: 70px; padding: 12px 14px; }
   .math-footer > span { display: none; }
   .math-footer button { width: 100%; margin-left: 0; }
-  .flappy-area { min-height: calc(100vh - 138px); }
+  .flappy-area { flex: 1; min-height: 0; }
   .flappy-footer { min-height: 51px; padding: 8px 14px; }
   .flappy-footer span:first-child { display: none; }
   .coin-area { min-height: calc(100vh - 138px); padding: 32px 16px; gap: 20px; }
