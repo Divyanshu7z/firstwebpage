@@ -913,6 +913,327 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
 }
 .dice-footer span + span { margin-left: auto; color: var(--color-ember-accent); }
 
+/* ── Alpha Sum (Ability Enhancement) ── */
+.alphasum-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.alphasum-hud {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.alphasum-modes {
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, .06);
+  padding: 4px;
+  border-radius: var(--radius-buttons-pill);
+  border: 1px solid rgba(255, 255, 255, .15);
+}
+
+.alphasum-mode-btn {
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-buttons-pill);
+  padding: 6px 14px;
+  color: var(--color-driftwood);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  transition: all .18s ease;
+}
+
+.alphasum-mode-btn:hover {
+  color: var(--color-warm-cream);
+}
+
+.alphasum-mode-btn.is-active {
+  color: var(--color-walnut-shadow);
+  background: var(--color-warm-cream);
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .25);
+}
+
+.alphasum-area {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 510px;
+  overflow: hidden;
+  padding: 38px 24px 34px;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, .12), transparent 40%), rgba(255, 255, 255, .04);
+  text-align: center;
+  gap: 16px;
+}
+
+.alphasum-glow {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: .2;
+  pointer-events: none;
+}
+.alphasum-glow-one { top: -110px; right: -80px; background: var(--color-ember-accent); }
+.alphasum-glow-two { bottom: -120px; left: -90px; background: #e09f3e; }
+
+.alphasum-header-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(580px, 100%);
+  gap: 12px;
+}
+
+.alphasum-kicker {
+  margin: 0;
+  color: var(--color-ember-accent);
+  font-family: var(--font-arial);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+
+.alphasum-guide-toggle {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: var(--radius-buttons-pill);
+  padding: 4px 12px;
+  color: var(--color-warm-cream);
+  background: rgba(255, 255, 255, .08);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  transition: all .18s ease;
+}
+.alphasum-guide-toggle:hover {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .45);
+}
+
+.alphasum-guide {
+  position: relative;
+  z-index: 1;
+  width: min(580px, 100%);
+  max-height: 200px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height .3s ease, opacity .25s ease, margin .3s ease;
+  margin: 0 0 4px;
+}
+.alphasum-guide.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+.alphasum-chart-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 7px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(16, 9, 4, .45);
+  border: 1px solid rgba(255, 255, 255, .12);
+  font-family: var(--font-halyard-display-variable);
+  font-size: 11px;
+  color: var(--color-driftwood);
+}
+.alphasum-chart-grid span {
+  display: inline-block;
+  color: var(--color-warm-cream);
+  background: rgba(255, 255, 255, .06);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.alphasum-tiles-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 72px;
+  max-width: min(620px, 100%);
+  margin: 4px 0;
+}
+
+.alphasum-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(38px, 6.5vw, 56px);
+  height: clamp(48px, 8.5vw, 68px);
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, .35);
+  background: linear-gradient(160deg, rgba(255, 255, 255, .24), rgba(255, 237, 215, .08));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .22), inset 0 1px 1px rgba(255, 255, 255, .45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--color-warm-cream);
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  animation: tile-pop .25s ease-out;
+}
+
+@keyframes tile-pop {
+  0% { transform: scale(.7) translateY(8px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.alphasum-tiles-container.is-correct .alphasum-tile {
+  border-color: #22c55e;
+  color: #22c55e;
+  box-shadow: 0 0 18px rgba(34, 197, 94, .35);
+}
+
+.alphasum-tiles-container.is-wrong .alphasum-tile {
+  border-color: var(--color-ember-accent);
+  color: var(--color-ember-accent);
+  box-shadow: 0 0 18px rgba(220, 80, 0, .35);
+  animation: tile-shake .3s ease-in-out;
+}
+
+@keyframes tile-shake {
+  25%, 75% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+}
+
+.alphasum-rule {
+  position: relative;
+  z-index: 1;
+  max-width: 520px;
+  margin: 2px 0 12px;
+  color: var(--color-warm-cream);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.alphasum-answer-form {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(445px, 100%);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .06));
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+.alphasum-answer-form:focus-within { border-color: var(--color-warm-cream); }
+.alphasum-answer-form input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  padding: 16px 20px;
+  color: var(--color-warm-cream);
+  background: transparent;
+  font-size: 19px;
+  font-weight: 500;
+  text-align: left;
+}
+.alphasum-answer-form input::placeholder {
+  color: var(--color-driftwood);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+.alphasum-answer-form input:disabled { opacity: .6; }
+.alphasum-answer-form button {
+  min-width: 105px;
+  cursor: pointer;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 0;
+  color: var(--color-warm-cream);
+  background: rgba(255, 255, 255, .1);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+.alphasum-answer-form button:hover:not(:disabled) { background: rgba(255, 255, 255, .18); }
+.alphasum-answer-form button:disabled, .alphasum-footer button:disabled { cursor: default; opacity: .55; }
+
+.alphasum-status {
+  position: relative;
+  z-index: 1;
+  min-height: 20px;
+  margin: 6px 0 10px;
+  color: var(--color-ember-accent);
+  font-family: var(--font-arial);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+}
+
+.alphasum-progress {
+  position: relative;
+  z-index: 1;
+  width: min(445px, 100%);
+  height: 2px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--color-cork-border);
+}
+.alphasum-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-warm-cream);
+  transition: width .18s linear;
+}
+
+.alphasum-footer button {
+  margin-left: auto;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .4);
+  border-radius: var(--radius-buttons-pill);
+  padding: 14px 24px;
+  color: var(--color-warm-cream);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 237, 215, .08));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65), 0 10px 24px rgba(0, 0, 0, .16);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: uppercase;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.alphasum-footer button:hover:not(:disabled) { opacity: .92; transform: translateY(-1px); }
+
+
 @media (max-width: 620px) {
   .game-shell { display: flex; flex-direction: column; padding: 40px 0 0 0; min-height: 100vh; justify-content: flex-start; }
   .game-card { flex: 1; border: 0; border-radius: 0; min-height: 0; }
@@ -962,6 +1283,15 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   .dice-mini { width: 28px; height: 28px; font-size: 12px; }
   .dice-footer { min-height: 51px; padding: 8px 14px; }
   .dice-footer span:first-child { display: none; }
+  .alphasum-hud { min-height: 68px; padding: 10px 14px; gap: 10px; }
+  .alphasum-hud .alphasum-modes { order: 3; width: 100%; justify-content: space-between; }
+  .alphasum-hud .stat:nth-of-type(2) { display: none; }
+  .alphasum-area { min-height: calc(100vh - 138px); padding: 24px 14px; gap: 12px; }
+  .alphasum-rule { font-size: 14px; margin-bottom: 6px; }
+  .alphasum-chart-grid { font-size: 9.5px; padding: 8px; gap: 3px 5px; }
+  .alphasum-footer { min-height: 70px; padding: 12px 14px; }
+  .alphasum-footer > span:first-child { display: none; }
+  .alphasum-footer button { width: 100%; margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -1,4 +1,5 @@
 import './style.css'
+import { alphaWords, calculateWordSum, getWordBreakdown, type Difficulty } from './alphaWords'
 
 type IncomingWord = { word: string; x: number; y: number; speed: number }
 type Star = { x: number; y: number; speed: number; size: number; color: string }
@@ -70,6 +71,10 @@ app.innerHTML = `
         <button class="ps5-game-card" type="button" data-game="dice" aria-controls="dice-game" aria-pressed="false">
           <div class="ps5-icon">🎲</div>
           <div class="ps5-title">Dice Roll</div>
+        </button>
+        <button class="ps5-game-card" type="button" data-game="alphasum" aria-controls="alphasum-game" aria-pressed="false">
+          <div class="ps5-icon">🔤</div>
+          <div class="ps5-title">Alpha Sum</div>
         </button>
       </div>
     </nav>
@@ -168,6 +173,54 @@ app.innerHTML = `
     </div>
     <footer class="footer dice-footer"><span>Roll the dice and test your luck.</span><span id="dice-total-status" aria-live="polite">READY</span></footer>
   </section>
+  <section class="game-card alphasum-card is-hidden" id="alphasum-game" aria-label="Alpha Sum ability enhancement game">
+    <header class="hud alphasum-hud">
+      <div class="brand"><span>∑</span> ALPHA SUM</div>
+      <div class="alphasum-modes" role="group" aria-label="Difficulty mode">
+        <button type="button" class="alphasum-mode-btn is-active" data-mode="easy">Easy (3-4)</button>
+        <button type="button" class="alphasum-mode-btn" data-mode="mid">Mid (5-6)</button>
+        <button type="button" class="alphasum-mode-btn" data-mode="hard">Hard (7-9)</button>
+      </div>
+      <div class="stat"><span>Time</span><strong id="alphasum-time">1:00</strong></div>
+      <div class="stat"><span>Streak</span><strong id="alphasum-streak">00</strong></div>
+      <div class="stat"><span>Score</span><strong id="alphasum-score">00</strong></div>
+      <div class="stat"><span>Best</span><strong id="alphasum-best">00</strong></div>
+    </header>
+    <div class="alphasum-area">
+      <div class="alphasum-glow alphasum-glow-one"></div>
+      <div class="alphasum-glow alphasum-glow-two"></div>
+      <div class="alphasum-header-row">
+        <p class="alphasum-kicker" id="alphasum-kicker">ABILITY ENHANCEMENT · A=1 TO Z=26</p>
+        <button type="button" class="alphasum-guide-toggle" id="alphasum-guide-toggle" aria-expanded="false">A-Z Chart</button>
+      </div>
+      <div class="alphasum-guide is-collapsed" id="alphasum-guide">
+        <div class="alphasum-chart-grid">
+          <span>A=1</span><span>B=2</span><span>C=3</span><span>D=4</span><span>E=5</span>
+          <span>F=6</span><span>G=7</span><span>H=8</span><span>I=9</span><span>J=10</span>
+          <span>K=11</span><span>L=12</span><span>M=13</span><span>N=14</span><span>O=15</span>
+          <span>P=16</span><span>Q=17</span><span>R=18</span><span>S=19</span><span>T=20</span>
+          <span>U=21</span><span>V=22</span><span>W=23</span><span>X=24</span><span>Y=25</span><span>Z=26</span>
+        </div>
+      </div>
+      <div class="alphasum-tiles-container" id="alphasum-tiles" aria-live="polite">
+        <span class="alphasum-tile">C</span>
+        <span class="alphasum-tile">U</span>
+        <span class="alphasum-tile">T</span>
+      </div>
+      <p class="alphasum-rule" id="alphasum-rule">Sum the alphabet values of all letters (e.g. C=3 + U=21 + T=20 = 44).</p>
+      <form class="alphasum-answer-form" id="alphasum-answer-form">
+        <label class="sr-only" for="alphasum-answer">Total sum</label>
+        <input id="alphasum-answer" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="sum (e.g. 44)" disabled>
+        <button id="alphasum-submit" type="submit" disabled>Check</button>
+      </form>
+      <p class="alphasum-status" id="alphasum-status" aria-live="polite">SELECT DIFFICULTY & PRESS START</p>
+      <div class="alphasum-progress" aria-hidden="true"><span id="alphasum-progress-fill"></span></div>
+    </div>
+    <footer class="footer alphasum-footer">
+      <span id="alphasum-footer-info">1,200+ words · Local deck · A=1 ... Z=26</span>
+      <button id="alphasum-start" type="button">Start 1-Minute Run</button>
+    </footer>
+  </section>
   </div></main>`
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!
@@ -230,6 +283,24 @@ const diceBestEl = document.querySelector<HTMLElement>('#dice-best')!
 const diceRollBtn = document.querySelector<HTMLButtonElement>('#dice-roll-btn')!
 const diceHistoryEl = document.querySelector<HTMLElement>('#dice-history')!
 const diceTotalStatusEl = document.querySelector<HTMLElement>('#dice-total-status')!
+const alphasumGame = document.querySelector<HTMLElement>('#alphasum-game')!
+const alphasumModeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.alphasum-mode-btn'))
+const alphasumTimeEl = document.querySelector<HTMLElement>('#alphasum-time')!
+const alphasumStreakEl = document.querySelector<HTMLElement>('#alphasum-streak')!
+const alphasumScoreEl = document.querySelector<HTMLElement>('#alphasum-score')!
+const alphasumBestEl = document.querySelector<HTMLElement>('#alphasum-best')!
+const alphasumKickerEl = document.querySelector<HTMLElement>('#alphasum-kicker')!
+const alphasumTilesContainer = document.querySelector<HTMLElement>('#alphasum-tiles')!
+const alphasumRuleEl = document.querySelector<HTMLElement>('#alphasum-rule')!
+const alphasumAnswerForm = document.querySelector<HTMLFormElement>('#alphasum-answer-form')!
+const alphasumAnswerInput = document.querySelector<HTMLInputElement>('#alphasum-answer')!
+const alphasumSubmitButton = document.querySelector<HTMLButtonElement>('#alphasum-submit')!
+const alphasumStatusEl = document.querySelector<HTMLElement>('#alphasum-status')!
+const alphasumProgressFill = document.querySelector<HTMLElement>('#alphasum-progress-fill')!
+const alphasumStartButton = document.querySelector<HTMLButtonElement>('#alphasum-start')!
+const alphasumGuideToggle = document.querySelector<HTMLButtonElement>('#alphasum-guide-toggle')!
+const alphasumGuide = document.querySelector<HTMLElement>('#alphasum-guide')!
+const alphasumFooterInfo = document.querySelector<HTMLElement>('#alphasum-footer-info')!
 
 let width = 0, height = 0, scale = 1, lastFrame = 0
 let active = false, paused = false, wave = 1, waveSize = 1, spawned = 0, cleared = 0, deckIndex = 0, spawnTimer = 0, nextWaveTimer = 0
@@ -239,7 +310,7 @@ let best = getStoredScore('word-siege-best')
 let audioContext: AudioContext | undefined
 let mathActive = false, mathLevel = 1, mathScore = 0, mathStartedAt = 0, mathQuestion: MathQuestion | undefined
 let background = ctx.createLinearGradient(0, 0, 0, 1)
-let selectedGame: 'word' | 'math' | 'flappy' | 'coin' | 'dice' | null = null
+let selectedGame: 'word' | 'math' | 'flappy' | 'coin' | 'dice' | 'alphasum' | null = null
 let resizeFrame = 0, lastTypeSoundAt = 0
 const usedMathQuestions = new Set<string>()
 let mathBest = getStoredScore('math-rush-best')
@@ -247,10 +318,19 @@ let flappyWidth = 0, flappyHeight = 0, flappyScale = 1, flappyActive = false, fl
 let flappyBird = { y: 0, velocity: 0 }, flappyPipes: { x: number; gapY: number; counted: boolean }[] = [], flappySpawnTimer = 0
 let coinFlipping = false, coinPick: CoinSide | null = null, coinHeadsCount = 0, coinTailsCount = 0, coinStreak = 0, coinBestStreak = getStoredScore('coin-toss-best')
 let diceRolling = false, diceRollCount = 0, diceSixStreak = 0, diceBestSixStreak = getStoredScore('dice-roll-best'), diceHistory: number[] = []
+let alphasumActive = false, alphasumDifficulty: Difficulty = 'easy', alphasumScore = 0, alphasumStreak = 0, alphasumStartedAt = 0
+let currentAlphaWord = 'cut', currentAlphaAnswer = 44
+const usedAlphaWords = new Set<string>()
+const alphasumBestScores: Record<Difficulty, number> = {
+  easy: getStoredScore('alphasum-easy-best'),
+  mid: getStoredScore('alphasum-mid-best'),
+  hard: getStoredScore('alphasum-hard-best')
+}
 bestEl.textContent = String(best).padStart(3, '0')
 mathBestEl.textContent = String(mathBest).padStart(2, '0')
 flappyBestEl.textContent = String(flappyBest).padStart(2, '0')
 coinBestEl.textContent = String(coinBestStreak)
+alphasumBestEl.textContent = String(alphasumBestScores.easy).padStart(2, '0')
 
 function shuffle<T>(items: T[]) { const copy = [...items]; for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copy[i], copy[j]] = [copy[j], copy[i]] } return copy }
 function getStoredScore(key: string) { try { const value = Number(localStorage.getItem(key)); return Number.isFinite(value) && value >= 0 ? value : 0 } catch { return 0 } }
@@ -885,7 +965,143 @@ function rollDice() {
   }, 1250)
 }
 
-function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
+// ── Alpha Sum (Ability Enhancement) ──
+function updateAlphaSumHud(remainingSeconds = 60) {
+  alphasumTimeEl.textContent = formatMathTime(remainingSeconds)
+  alphasumStreakEl.textContent = String(alphasumStreak).padStart(2, '0')
+  alphasumScoreEl.textContent = String(alphasumScore).padStart(2, '0')
+  alphasumBestEl.textContent = String(alphasumBestScores[alphasumDifficulty]).padStart(2, '0')
+  alphasumProgressFill.style.width = `${Math.max(0, Math.min(100, (remainingSeconds / 60) * 100))}%`
+  if (alphasumScore > alphasumBestScores[alphasumDifficulty]) {
+    alphasumBestScores[alphasumDifficulty] = alphasumScore
+    alphasumBestEl.textContent = String(alphasumScore).padStart(2, '0')
+    saveScore(`alphasum-${alphasumDifficulty}-best`, alphasumScore)
+  }
+}
+
+function renderAlphaTiles(word: string) {
+  alphasumTilesContainer.innerHTML = ''
+  for (const char of word.toUpperCase()) {
+    const tile = document.createElement('span')
+    tile.className = 'alphasum-tile'
+    tile.textContent = char
+    alphasumTilesContainer.appendChild(tile)
+  }
+}
+
+function pickNextAlphaWord() {
+  const list = alphaWords[alphasumDifficulty]
+  const available = list.filter(w => !usedAlphaWords.has(w))
+  const pool = available.length > 0 ? available : list
+  if (available.length === 0) usedAlphaWords.clear()
+
+  const chosen = pool[Math.floor(Math.random() * pool.length)]
+  usedAlphaWords.add(chosen)
+  currentAlphaWord = chosen
+  currentAlphaAnswer = calculateWordSum(chosen)
+  renderAlphaTiles(chosen)
+}
+
+function animateAlphaTiles(state: 'is-correct' | 'is-wrong') {
+  alphasumTilesContainer.classList.remove('is-correct', 'is-wrong')
+  void alphasumTilesContainer.offsetWidth
+  alphasumTilesContainer.classList.add(state)
+}
+
+function setAlphaSumDifficulty(diff: Difficulty) {
+  alphasumDifficulty = diff
+  alphasumModeButtons.forEach(btn => {
+    const active = btn.dataset.mode === diff
+    btn.classList.toggle('is-active', active)
+    btn.setAttribute('aria-pressed', String(active))
+  })
+  alphasumBestEl.textContent = String(alphasumBestScores[diff]).padStart(2, '0')
+  alphasumFooterInfo.textContent = `${alphaWords[diff].length} words in ${diff.toUpperCase()} deck · A=1, B=2 ... Z=26`
+  if (!alphasumActive) {
+    pickNextAlphaWord()
+    alphasumStatusEl.textContent = `MODE: ${diff.toUpperCase()} (${diff === 'easy' ? '3-4' : diff === 'mid' ? '5-6' : '7-9'} LETTERS)`
+  }
+}
+
+function startAlphaSumGame() {
+  getAudio()
+  alphasumActive = true
+  alphasumScore = 0
+  alphasumStreak = 0
+  alphasumStartedAt = performance.now()
+  usedAlphaWords.clear()
+  alphasumKickerEl.textContent = `60-SECOND SPRINT · ${alphasumDifficulty.toUpperCase()} MODE`
+  alphasumRuleEl.textContent = 'Sum the letters fast: A=1, B=2 … Z=26. Every correct answer raises your streak!'
+  alphasumStatusEl.textContent = 'GO! CALCULATE THE WORD SUM'
+  alphasumAnswerInput.value = ''
+  alphasumAnswerInput.disabled = false
+  alphasumSubmitButton.disabled = false
+  alphasumStartButton.textContent = 'Running…'
+  alphasumStartButton.disabled = true
+  pickNextAlphaWord()
+  updateAlphaSumHud(60)
+  alphasumAnswerInput.focus()
+}
+
+function finishAlphaSumGame() {
+  if (!alphasumActive) return
+  alphasumActive = false
+  alphasumAnswerInput.disabled = true
+  alphasumSubmitButton.disabled = true
+  alphasumKickerEl.textContent = 'RUN COMPLETE'
+  alphasumRuleEl.textContent = `You solved ${alphasumScore} ${alphasumScore === 1 ? 'word' : 'words'} in ${alphasumDifficulty.toUpperCase()} mode.`
+  alphasumStatusEl.textContent = alphasumScore > 0 ? `AWESOME! FINAL SCORE: ${alphasumScore}` : 'NICE EFFORT — PLAY AGAIN TO BOOST YOUR SPEED!'
+  alphasumProgressFill.style.width = '0%'
+  alphasumStartButton.textContent = 'Play Again'
+  alphasumStartButton.disabled = false
+  updateAlphaSumHud(0)
+}
+
+function updateAlphaSumTimer(now: number) {
+  if (!alphasumActive) return
+  const remainingMilliseconds = 60000 - (now - alphasumStartedAt)
+  if (remainingMilliseconds <= 0) {
+    finishAlphaSumGame()
+    return
+  }
+  updateAlphaSumHud(Math.ceil(remainingMilliseconds / 1000))
+}
+
+function submitAlphaSumAnswer() {
+  if (!alphasumActive) return
+  const value = alphasumAnswerInput.value.trim()
+  if (!/^\d+$/.test(value)) {
+    alphasumStatusEl.textContent = 'ENTER A POSITIVE NUMBER'
+    animateAlphaTiles('is-wrong')
+    return
+  }
+  const numericVal = Number(value)
+  const breakdown = getWordBreakdown(currentAlphaWord)
+  if (numericVal !== currentAlphaAnswer) {
+    alphasumStreak = 0
+    alphasumStatusEl.textContent = `NOT QUITE — ${breakdown}`
+    alphasumAnswerInput.select()
+    animateAlphaTiles('is-wrong')
+    tone(180, .25, 'sine', 90, .03)
+    return
+  }
+  alphasumStreak++
+  alphasumScore++
+  clearSound()
+  alphasumStatusEl.textContent = `CORRECT! ${breakdown}`
+  alphasumAnswerInput.value = ''
+  animateAlphaTiles('is-correct')
+  pickNextAlphaWord()
+  updateAlphaSumHud(Math.ceil(Math.max(0, 60000 - (performance.now() - alphasumStartedAt)) / 1000))
+}
+
+function toggleAlphaSumGuide() {
+  const isCollapsed = alphasumGuide.classList.toggle('is-collapsed')
+  alphasumGuideToggle.setAttribute('aria-expanded', String(!isCollapsed))
+  alphasumGuideToggle.textContent = isCollapsed ? 'A-Z Chart' : 'Hide Chart'
+}
+
+function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice' | 'alphasum') {
   if (selectedGame === game) {
     if (active && !paused) togglePause()
     wordGame.classList.add('is-hidden')
@@ -893,6 +1109,7 @@ function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
     flappyGame.classList.add('is-hidden')
     coinGame.classList.add('is-hidden')
     diceGame.classList.add('is-hidden')
+    alphasumGame.classList.add('is-hidden')
     gameTabs.forEach((tab) => {
       tab.classList.remove('is-active')
       tab.setAttribute('aria-pressed', 'false')
@@ -907,12 +1124,14 @@ function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
   const showFlappy = game === 'flappy'
   const showCoin = game === 'coin'
   const showDice = game === 'dice'
+  const showAlphaSum = game === 'alphasum'
   if (!showWord && active && !paused) togglePause()
   wordGame.classList.toggle('is-hidden', !showWord)
   mathGame.classList.toggle('is-hidden', !showMath)
   flappyGame.classList.toggle('is-hidden', !showFlappy)
   coinGame.classList.toggle('is-hidden', !showCoin)
   diceGame.classList.toggle('is-hidden', !showDice)
+  alphasumGame.classList.toggle('is-hidden', !showAlphaSum)
   gameTabs.forEach((tab) => {
     const selected = tab.dataset.game === game
     tab.classList.toggle('is-active', selected)
@@ -922,9 +1141,18 @@ function selectGame(game: 'word' | 'math' | 'flappy' | 'coin' | 'dice') {
   selectedGame = game
   if (showWord) queueResize()
   if (showMath && mathActive) mathAnswerInput.focus()
+  if (showAlphaSum && alphasumActive) alphasumAnswerInput.focus()
   if (showFlappy) { requestAnimationFrame(() => { requestAnimationFrame(() => { resizeFlappy(); drawFlappy() }) }) }
 }
-function frame(now: number) { const dt = Math.min((now - lastFrame) / 1000 || 0, .05); lastFrame = now; if (selectedGame === 'word') { update(dt); draw() }; if (selectedGame === 'flappy') { updateFlappy(dt); drawFlappy() }; updateMathTimer(now); requestAnimationFrame(frame) }
+function frame(now: number) {
+  const dt = Math.min((now - lastFrame) / 1000 || 0, .05)
+  lastFrame = now
+  if (selectedGame === 'word') { update(dt); draw() }
+  if (selectedGame === 'flappy') { updateFlappy(dt); drawFlappy() }
+  updateMathTimer(now)
+  updateAlphaSumTimer(now)
+  requestAnimationFrame(frame)
+}
 
 input.addEventListener('input', checkInput)
 input.addEventListener('keydown', (event) => { if (event.key === 'Escape') togglePause(); if (event.key === ' ') event.preventDefault() })
@@ -944,13 +1172,21 @@ pickTailsBtn.addEventListener('click', () => {
   else selectCoinPick('tails')
 })
 diceRollBtn.addEventListener('click', rollDice)
+alphasumModeButtons.forEach(btn => btn.addEventListener('click', () => {
+  const mode = btn.dataset.mode as Difficulty
+  if (mode === 'easy' || mode === 'mid' || mode === 'hard') setAlphaSumDifficulty(mode)
+}))
+alphasumAnswerForm.addEventListener('submit', (event) => { event.preventDefault(); submitAlphaSumAnswer() })
+alphasumStartButton.addEventListener('click', startAlphaSumGame)
+alphasumGuideToggle.addEventListener('click', toggleAlphaSumGuide)
 gameTabs.forEach((tab) => tab.addEventListener('click', () => {
-  const game = tab.dataset.game as 'word' | 'math' | 'flappy' | 'coin' | 'dice'
-  if (game === 'word' || game === 'math' || game === 'flappy' || game === 'coin' || game === 'dice') selectGame(game)
+  const game = tab.dataset.game as 'word' | 'math' | 'flappy' | 'coin' | 'dice' | 'alphasum'
+  if (game === 'word' || game === 'math' || game === 'flappy' || game === 'coin' || game === 'dice' || game === 'alphasum') selectGame(game)
 }))
 window.addEventListener('keydown', (event) => {
   if (selectedGame === 'flappy' && event.code === 'Space') { event.preventDefault(); flap() }
   if (selectedGame === 'dice' && event.code === 'Space') { event.preventDefault(); rollDice() }
 })
 window.addEventListener('resize', () => { queueResize(); queueFlappyResize() })
-resize(); resizeFlappy(); updateHud(); updateWaveInfo(); updateFlappyHud(); requestAnimationFrame(frame)
+resize(); resizeFlappy(); updateHud(); updateWaveInfo(); updateFlappyHud(); pickNextAlphaWord(); requestAnimationFrame(frame)
+
