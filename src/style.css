@@ -935,6 +935,14 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   border: 1px solid rgba(255, 255, 255, .15);
 }
 
+@media (min-width: 621px) {
+  .alphasum-modes {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
 .alphasum-mode-btn {
   cursor: pointer;
   border: 0;
@@ -993,8 +1001,10 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   display: flex;
   align-items: center;
   justify-content: space-between;
+  justify-content: center;
   width: min(580px, 100%);
   gap: 12px;
+  gap: 16px;
 }
 
 .alphasum-kicker {
@@ -1156,6 +1166,7 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   font-size: 19px;
   font-weight: 500;
   text-align: left;
+  text-align: center;
 }
 .alphasum-answer-form input::placeholder {
   color: var(--color-driftwood);
@@ -1214,8 +1225,18 @@ button:focus-visible, input:focus-visible { outline: 1px dashed var(--color-warm
   transition: width .18s linear;
 }
 
+.alphasum-footer {
+  justify-content: center;
+}
+.alphasum-footer > span:first-child {
+  position: absolute;
+  left: clamp(18px, 3vw, 26px);
+}
 .alphasum-footer button {
   margin-left: auto;
+  margin-left: 0;
+  width: auto;
+  height: auto;
   font-size: 12px;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, .4);
